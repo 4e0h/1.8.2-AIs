@@ -1006,12 +1006,6 @@ static void GameThreadTick()
 
     if (const int Toggles = GTurboToggles.exchange(0))
     {
-        const bool bOn = GTurboBuild.load();
-        const std::wstring Text = bOn ? L"F7: makeshift turbo building ON -- hold the left mouse button in build mode"
-                                      : L"F7: makeshift turbo building OFF";
-
-        SayInConsole(Text);
-        TellServer(Text + (GTurboBroken ? L" (but it switched itself off after a fault earlier)" : L""));
         (void)Toggles;
     }
 
