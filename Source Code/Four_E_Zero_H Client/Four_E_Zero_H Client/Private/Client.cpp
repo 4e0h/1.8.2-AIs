@@ -55,29 +55,19 @@ void JoinLocalServer()
     UKismetSystemLibrary::ExecuteConsoleCommand(World, FString(Command.c_str()), nullptr);
 }
 
-// ==== round 4: F7 makeshift turbo building, the "no killer" killfeed lines, and reports to the gameserver's log ====
-//
-// Everything that touches the game runs on the game's own thread, from a hook on ProcessEvent (the call UE4 makes from
-// that thread all the time). The key thread (ClientThread, below) only flips flags. Anything here that faults switches
-// itself off and says so in the gameserver's log instead of taking the game down.
-//
-// The gameserver writes what this sends it ("cheat clientlog <text>") into its log as [CLIENT] lines -- so the server's
-// log says what this screen really showed (its killfeed, the "Eliminated" popup, the storm timer), not only what the
-// server sent.
-
-static std::atomic<bool> GTurboBuild{ false };   // F7: makeshift turbo building on/off
-static std::atomic<int> GTurboToggles{ 0 };      // F7 presses the game thread has not announced yet
-static std::atomic<DWORD> GGameThreadId{ 0 };    // the thread that owns the game window -- the game thread
+static std::atomic<bool> GTurboBuild{ false };   
+static std::atomic<int> GTurboToggles{ 0 };      
+static std::atomic<DWORD> GGameThreadId{ 0 };    
 
 static void (*ProcessEventOG)(UObject*, UFunction*, void*) = nullptr;
-static int GInOurCode = 0;                       // game thread only: our own calls into ProcessEvent pass straight through
+static int GInOurCode = 0;                       
 
 static bool GTurboBroken = false;
 static bool GKillFeedBroken = false;
 static bool GReportsBroken = false;
 static bool GStormReportBroken = false;
-static int GFaults = 0;                          // faults caught in the code below
-static bool GFaultToReport = false;              // the next (guarded) tick tells the server about it
+static int GFaults = 0;                          
+static bool GFaultToReport = false;              
 
 static FName GNameOnRepDeathInfo;
 static FName GNameUpdateKillFeed;
@@ -138,7 +128,6 @@ static std::wstring OneDecimal(double Value)
     return std::wstring(Out);
 }
 
-// A line into the gameserver's log. Game thread only. At most 6 a second, bursts of 12.
 static void TellServer(const std::wstring& Text)
 {
     static UFunction* Fn = nullptr;
@@ -151,7 +140,6 @@ static void TellServer(const std::wstring& Text)
     if (GReportsBroken)
         return;
 
-    // Only in a match on a server: in the menus there is nobody to tell.
     auto World = UWorld::GetWorld();
     if (!World || !World->NetDriver)
         return;
@@ -206,12 +194,10 @@ static void TellServer(const std::wstring& Text)
 
     Controller->ProcessEvent(Fn, Buffer);
 
-    // The RPC has been written into the packet by now.
     if (Param.Data)
         FMemory::Free(Param.Data);
 }
 
-// A line in this game's own console ("~").
 static void SayInConsole(const std::wstring& Text)
 {
     static UFunction* Fn = nullptr;
@@ -261,7 +247,6 @@ static int32 ReflectedOffset(const UObject* Object, const char* Name)
     return Offset == (uint32)-1 ? -1 : (int32)Offset;
 }
 
-// The name exactly as the game replicates it (APlayerState::PlayerName on 1.8.2).
 static std::wstring PlayerNameOf(const UObject* PlayerState)
 {
     static int32 Offset = -2;
@@ -288,16 +273,9 @@ static std::wstring PlayerNameOf(const UObject* PlayerState)
     return std::wstring(Name.CStr());
 }
 
-// ---- F7: makeshift turbo building -----------------------------------------------------------------------------
-//
-// Turbo building only came in Season 3: hold the button and a piece goes down wherever the preview moves to. This is the
-// makeshift version: while F7 is on and the left mouse button is held in build mode (after the first 0.15s, so a plain
-// click stays the game's own), the piece under the preview is sent to the server -- ServerCreateBuildingActor, the same
-// call a click sends -- each time the preview moves to a new spot, and again every 0.4s on the same one. The server builds
-// it only where nothing is in the way, so going over a spot twice does nothing.
 struct FTurboBuild
 {
-    ULONGLONG HoldStart = 0;      // when the button went down with F7 on (0 = not held)
+    ULONGLONG HoldStart = 0;      
     ULONGLONG LastSend = 0;
     const void* LastClass = nullptr;
     float LastLoc[3] = {};
@@ -306,7 +284,7 @@ struct FTurboBuild
     int SentThisHold = 0;
     int SpotsThisHold = 0;
     int SentTotal = 0;
-    int32 PreviousLevel = 0;      // FBuildingClassData's levels, as the game's own last placement sent them
+    int32 PreviousLevel = 0;      
     int32 UpgradeLevel = 0;
 };
 
@@ -400,7 +378,6 @@ static void TurboBuildTick(ULONGLONG Now)
     if (!GCreateUsable || !InBuildMode(Controller))
         return;
 
-    // Never while editing a piece: the button picks edit tiles then.
     static int32 EditOffset = -2;
 
     if (EditOffset == -2)
@@ -461,13 +438,6 @@ static void TurboBuildTick(ULONGLONG Now)
     GTurbo.SentTotal++;
 }
 
-// ---- the "no killer" killfeed lines ---------------------------------------------------------------------------
-//
-// The gameserver gives a death with no real killer to nobody: the dead player is written down as their own finisher, and
-// the game's killfeed makes its own line for that. This swaps that line for the one the server's log has for the same
-// death -- "<name> had an oopsie", "<name> took the L", "<name> took the easy way out", "looks like we lost <name>" or
-// "<name> paid the 500 dollars" (NoKillerMessages.h picks it from the name, the same way on both sides), with the name in
-// the killfeed's red <Victim> style -- and tells the server's log every killfeed line this screen really shows.
 struct FNoKillerDeath
 {
     std::wstring Name;
@@ -475,7 +445,7 @@ struct FNoKillerDeath
 };
 
 static std::vector<FNoKillerDeath> GNoKillerDeaths;
-static std::vector<const void*> GKillFeedSeen;   // the text behind each killfeed line already looked at
+static std::vector<const void*> GKillFeedSeen;   
 static UObject* GKillFeedWidget = nullptr;
 static int32 GKillFeedWidgetIndex = -1;
 
@@ -501,7 +471,7 @@ static void OnDeathInfoArrived(UObject* PlayerState)
     auto Finisher = GetFromOffset<UObject*>(PlayerState, (uint32)(GDeathInfoOffset + GFinisherOffset));
 
     if (Finisher && Finisher != PlayerState)
-        return;   // somebody got the elim: the game's own line stays
+        return;   
 
     const std::wstring Name = PlayerNameOf(PlayerState);
     if (Name.empty())
@@ -527,7 +497,6 @@ static std::wstring TextToWide(FText& Text)
     return Wide;
 }
 
-// The name as a whole word in the line -- "Bob" is not in "Bobby eliminated Carl".
 static bool LineNames(const std::wstring& Line, const std::wstring& Name)
 {
     auto IsWordChar = [](wchar_t Ch) { return iswalnum(Ch) || Ch == L'_'; };
@@ -544,8 +513,6 @@ static bool LineNames(const std::wstring& Line, const std::wstring& Name)
     return false;
 }
 
-// Looks at every killfeed line not looked at before: tells the server what it says, and swaps a "no killer" one.
-// Returns true if a line was swapped.
 static bool LookAtTheKillFeed()
 {
     auto World = UWorld::GetWorld();
@@ -554,7 +521,6 @@ static bool LookAtTheKillFeed()
 
     auto GameState = (UObject*)World->GameState;
 
-    // Looked up again whenever the game state is a different class (the menus have one too, without a killfeed).
     static const void* KillFeedClass = nullptr;
 
     if (GKillFeedOffset == -2 || (const void*)GameState->Class != KillFeedClass)
@@ -607,7 +573,6 @@ static bool LookAtTheKillFeed()
             if (!LineNames(Native, Death.Name))
                 continue;
 
-            // The name in the killfeed's own <Victim> style, so it is red like in the game's lines.
             Shown = NoKillerMessages::LineForKillFeed(NoKillerMessages::PickFor(Death.Name.c_str()), Death.Name);
 
             FText NewText = MakeText(Shown);
@@ -627,7 +592,6 @@ static bool LookAtTheKillFeed()
 
     GKillFeedSeen.swap(StillThere);
 
-    // A "no killer" death whose line never turned up.
     for (size_t d = 0; d < GNoKillerDeaths.size();)
     {
         if (Now - GNoKillerDeaths[d].At > 4000)
@@ -669,7 +633,7 @@ static void RefreshKillFeedWidget()
 
 static void OnClientReportKill(UFunction* Function, void* Params)
 {
-    static int Kind = -1;   // 0 = the victim's name (FString), 1 = the victim's player state
+    static int Kind = -1;   
     static uint32 Offset = 0;
 
     if (Kind == -1)
@@ -705,7 +669,6 @@ static void OnClientReportKill(UFunction* Function, void* Params)
                             : (L"popup on this screen: \"Eliminated " + Name + L"\""));
 }
 
-// ---- the storm timer, as this screen has it ---------------------------------------------------------------------
 static void ReportStorm()
 {
     struct FSeen
@@ -727,7 +690,6 @@ static void ReportStorm()
 
     auto GameState = (UObject*)World->GameState;
 
-    // Looked up again whenever the game state is a different class (the menus have one too, with no storm on it).
     static const void* LookedClass = nullptr;
 
     if (!bLooked || (const void*)GameState->Class != LookedClass)
@@ -799,13 +761,6 @@ static void ReportStorm()
                L", " + Secs(Now.LastR) + L" -> " + Secs(Now.NextR) + L" | server time " + Secs(ServerNow));
 }
 
-// ---- gliders, as this screen shows them (round 5) -----------------------------------------------------------------
-//
-// "can you fix the player ais not gliding (i dont think they are gliding but i could be wrong)". The gameserver can only say
-// what it set. This says what this screen has, 3 seconds after each player's glider opened (the first 8 others, and you):
-// the glider in their cosmetic loadout (the one the game draws), whether its mesh is there and showing, whether they are
-// still marked as skydiving, and how fast they came down in those 3 seconds -- yours being the measure of a real glide.
-// Then one line once the drop is over. Its own fault guard: if anything in here faults, only this switches off.
 static bool GGliderReportBroken = false;
 
 static int ReadBoolByName(const UObject* Object, const char* Name)
@@ -813,7 +768,7 @@ static int ReadBoolByName(const UObject* Object, const char* Name)
     if (!Object)
         return -1;
 
-    auto Prop = Object->GetProperty(Name, 0x20000);   // a bool
+    auto Prop = Object->GetProperty(Name, 0x20000);   
     if (!Prop)
         return -1;
 
@@ -832,7 +787,6 @@ static std::wstring WideObjectName(const UObject* Object)
     return std::wstring(Narrow.begin(), Narrow.end());
 }
 
-// One of the pawn's glider meshes: its mesh, and whether it is showing.
 static std::wstring GliderMeshOnScreen(const UObject* Pawn, const char* ComponentName, const char* MeshName, bool* bShowing)
 {
     const int32 Offset = ReflectedOffset(Pawn, ComponentName);
@@ -890,7 +844,6 @@ static void ReportGliders(ULONGLONG Now)
         }
     }
 
-    // Nobody under a glider in 10 minutes of looking: nothing to watch this game.
     if (Players == 0 && Now - FirstScan > 600000)
     {
         bDone = true;
@@ -969,7 +922,6 @@ static void ReportGliders(ULONGLONG Now)
         if (bYou)
             bYouChecked = true;
 
-        // The first 8 others, and always you.
         if (!bYou && ++Lines > 8)
             continue;
 
@@ -984,8 +936,6 @@ static void ReportGliders(ULONGLONG Now)
                    L"s after it opened");
     }
 
-    // The drop is over: nobody under an open glider for 20 seconds after somebody was -- once your own glide has been checked
-    // too (the bots are down long before you jump), or 2 minutes without one if yours never is.
     if (!bAnyOpen && Players > 0 && ((bYouChecked && Now - LastOpenAt >= 20000) || Now - LastOpenAt >= 120000))
     {
         bDone = true;
@@ -1008,7 +958,6 @@ static int ReportGlidersGuarded(ULONGLONG Now)
     }
 }
 
-// ---- on the game thread ---------------------------------------------------------------------------------------
 static void BeforeEvent(UObject* Object, UFunction* Function, void* Params)
 {
     const int32 Name = Function->Name.ComparisonIndex;
@@ -1020,7 +969,7 @@ static void BeforeEvent(UObject* Object, UFunction* Function, void* Params)
     }
     else if (Name == GNameUpdateKillFeed.ComparisonIndex)
     {
-        // The killfeed is about to draw its lines: a "no killer" one is swapped before it does.
+        
         GKillFeedWidget = Object;
         GKillFeedWidgetIndex = Object ? Object->Index : -1;
 
@@ -1033,7 +982,7 @@ static void BeforeEvent(UObject* Object, UFunction* Function, void* Params)
     }
     else if (Name == GNameServerCreateBuildingActor.ComparisonIndex && Params)
     {
-        // The game's own placement: its BuildingClassData levels are what F7's placements send too.
+        
         if (GCreateUsable && GCreateDataOffset >= 0)
         {
             GTurbo.PreviousLevel = *(int32*)((uint8*)Params + GCreateDataOffset + 8);
@@ -1072,7 +1021,6 @@ static void GameThreadTick()
         TurboBuildTick(Now);
     }
 
-    // Normally the killfeed's own UpdateKillFeed does this (BeforeEvent); this catches a line that came in some other way.
     if (!GKillFeedBroken && !GNoKillerDeaths.empty() && Now - LastKillFeed >= 250)
     {
         LastKillFeed = Now;
@@ -1087,7 +1035,6 @@ static void GameThreadTick()
         ReportStorm();
     }
 
-    // Round 5: gliders as this screen shows them -- with a fault guard of its own, so a fault here switches off only this.
     if (!GGliderReportBroken && !GReportsBroken && Now - LastGliders >= 1000)
     {
         LastGliders = Now;
@@ -1145,8 +1092,7 @@ static void ProcessEventHook(UObject* Object, UFunction* Function, void* Params)
 
     if (BeforeFault || TickFault)
     {
-        // First fault: the killfeed lines and turbo building off, and the server is told on the next tick (inside the
-        // guard). A second one: the reports to the server and the storm report off too -- nothing of ours is left running.
+
         GFaults++;
         GTurboBroken = true;
         GKillFeedBroken = true;
@@ -1164,13 +1110,6 @@ static void ProcessEventHook(UObject* Object, UFunction* Function, void* Params)
     }
 }
 
-// ---- putting the hook in -------------------------------------------------------------------------------------
-//
-// Hooking ProcessEvent means rewriting its first bytes, and the game thread is in and out of it all the time: written
-// from another thread, a call landing on half-written bytes would take the game down. So the hook goes in from the game
-// thread itself -- the thread that owns the game's window and handles its messages: this DLL's key thread posts the window
-// one message, and the window's message handler (subclassed just for that) puts the hook in when it arrives. The game
-// thread is then running this code, not ProcessEvent.
 static HWND GGameWindow = nullptr;
 static WNDPROC GGameWindowProcOG = nullptr;
 static UINT GInstallHookMessage = 0;
@@ -1198,7 +1137,6 @@ static LRESULT CALLBACK GameWindowProc(HWND Window, UINT Message, WPARAM WParam,
     return CallWindowProcW(GGameWindowProcOG, Window, Message, WParam, LParam);
 }
 
-// From the key thread, every loop until it is in.
 static void AskTheGameThreadForTheHook()
 {
     if (GHookInstalled.load())
@@ -1238,7 +1176,6 @@ static void InstallGameThreadHook()
     GNameClientReportKill = FName(L"ClientReportKill");
     GNameServerCreateBuildingActor = FName(L"ServerCreateBuildingActor");
 
-    // The hook itself goes in from the game thread (AskTheGameThreadForTheHook, from the key thread's loop).
 }
 
 void ClientThread()
@@ -1266,8 +1203,6 @@ void ClientThread()
             }
         }
 
-        // The game thread is the one that owns the game's window (UE4 makes its window on it): F7 turbo building, the
-        // killfeed lines and the reports to the server run there, from a hook it puts in itself.
         AskTheGameThreadForTheHook();
 
         if (!bPressed && GetAsyncKeyState(VK_F3))
@@ -1299,7 +1234,6 @@ void ClientThread()
         {
             bPressed = true;
 
-            // F7: makeshift turbo building on/off. The game thread says so in the game's console and the server's log.
             const bool bNowOn = !GTurboBuild.load();
             GTurboBuild.store(bNowOn);
             GTurboToggles++;
@@ -1457,7 +1391,6 @@ void Client::Init()
         }
     }
 
-    // F7 turbo building, the "no killer" killfeed lines and the reports to the server's log run on the game thread.
     InstallGameThreadHook();
 
     CreateThread(0, 0, (LPTHREAD_START_ROUTINE)ClientThread, 0, 0, 0);

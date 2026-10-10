@@ -6,13 +6,11 @@ class FCrashReporter
 public:
     static void Register();
 
-    
     static void EnterGuardedSection();
     static void LeaveGuardedSection();
 
     static int GetRecoveredNullCallCount();
 
-    
     struct FScopedGuard
     {
         FScopedGuard()

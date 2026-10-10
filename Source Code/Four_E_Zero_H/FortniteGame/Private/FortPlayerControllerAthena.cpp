@@ -30,13 +30,6 @@ void AFortPlayerControllerAthena::GetPlayerViewPoint(AFortPlayerControllerAthena
 extern uint64_t ApplyCharacterCustomization;
 uint64_t InitializePlayerGameplayAbilities_;
 
-// ---- the player's inventory and quickbars (1.8.2 and every build before 3.0) ----------------------------
-//
-// On these builds an item in the inventory can only be held or used once it is on a quickbar: the weapons bar
-// for the pickaxe and guns, the building bar for the building pieces (and traps). AFortInventory::GiveItem puts
-// each item on its bar as it is given. These check, every time the player gets a pawn, that everything they
-// carry really is on a bar -- and put back anything that is not. A building piece that is in the inventory but
-// on no bar is exactly a building piece you cannot build with.
 static bool InventoryHasItem(AFortInventory* Inventory, const UFortItemDefinition* Def)
 {
     if (!Inventory || !Def)
@@ -75,7 +68,6 @@ static bool QuickBarHolds(FQuickBar& Bar, FGuid& Guid)
     return false;
 }
 
-// Returns how many items had to be put back on a bar.
 static int PutMissingItemsOnQuickbars(AFortPlayerControllerAthena* PlayerController)
 {
     if (VersionInfo.FortniteVersion >= 3 || !PlayerController || !PlayerController->WorldInventory || !PlayerController->QuickBars)
@@ -84,7 +76,6 @@ static int PutMissingItemsOnQuickbars(AFortPlayerControllerAthena* PlayerControl
     auto QuickBars = PlayerController->QuickBars;
     auto& Entries = PlayerController->WorldInventory->Inventory.ReplicatedEntries;
 
-    // Collected first and added after: putting an item on a bar can touch the inventory.
     std::vector<std::pair<FGuid, bool>> Missing;
 
     for (int i = 0; i < Entries.Num(); i++)
@@ -119,8 +110,6 @@ static std::string ItemShortName(const UFortItemDefinition* Def)
     return std::string(Name.c_str());
 }
 
-// What the player really has, read back from the inventory and the quickbars themselves -- not what the code
-// meant to give them.
 static void LogPlayerInventory(AFortPlayerControllerAthena* PlayerController, const char* When, int PutBack)
 {
     static int Logged = 0;
@@ -294,7 +283,6 @@ void AFortPlayerControllerAthena::ServerAcknowledgePossession(UObject* Context, 
         static bool HasCosmeticLoadoutPC = PlayerController->HasCosmeticLoadoutPC();
         static bool HasCustomizationLoadout = PlayerController->HasCustomizationLoadout();
 
-        // Always ensure a pickaxe (1.8.2 has no CosmeticLoadoutPC -- previous gate skipped the kit)
         bool bGavePickaxe = false;
         if (HasCosmeticLoadoutPC && PlayerController->CosmeticLoadoutPC.Pickaxe)
         {
@@ -315,7 +303,6 @@ void AFortPlayerControllerAthena::ServerAcknowledgePossession(UObject* Context, 
                 PlayerController->WorldInventory->GiveItem(DefaultPickaxe);
         }
 
-        // Building pieces -- always grant when StartingItems is empty OR on early versions
         if (GameMode->StartingItems.Num() == 0 || VersionInfo.FortniteVersion < 3.0)
         {
             static auto WallBuild = FindObject<UFortItemDefinition>(L"/Game/Items/Weapons/BuildingTools/BuildingItemData_Wall.BuildingItemData_Wall");
@@ -331,12 +318,8 @@ void AFortPlayerControllerAthena::ServerAcknowledgePossession(UObject* Context, 
             if (!ConeBuild)
                 ConeBuild = FindObject<UFortItemDefinition>(L"BuildingItemData_RoofS");
 
-            // The edit tool, as the 14.60 build gives it -- the 1.8.2 port had dropped it, and on these builds
-            // nothing can be edited without it.
             static auto EditTool = FindObject<UFortItemDefinition>(L"/Game/Items/Weapons/BuildingTools/EditTool.EditTool");
 
-            // Each one only if the player does not already have it: the game's own starting items (given just
-            // below) can hold the same pieces, and a second copy of a piece takes a second building-bar slot.
             auto Inv = PlayerController->WorldInventory;
             if (WallBuild && !InventoryHasItem(Inv, WallBuild)) Inv->GiveItem(WallBuild);
             if (FloorBuild && !InventoryHasItem(Inv, FloorBuild)) Inv->GiveItem(FloorBuild);
@@ -370,7 +353,6 @@ void AFortPlayerControllerAthena::ServerAcknowledgePossession(UObject* Context, 
                     Listed += ItemShortName(StartingItem.Item) + " x" + std::to_string(StartingItem.Count);
                 }
 
-                // Skipped when the player already has it (see the building pieces above).
                 if (StartingItem.Item && StartingItem.Count && (!SmartItemDefClass || !StartingItem.Item->IsA(SmartItemDefClass)) &&
                     !InventoryHasItem(PlayerController->WorldInventory, StartingItem.Item))
                     PlayerController->WorldInventory->GiveItem(StartingItem.Item, StartingItem.Count);
@@ -445,9 +427,6 @@ void AFortPlayerControllerAthena::ServerAcknowledgePossession(UObject* Context, 
 
     static std::set<AFortPlayerControllerAthena*> GivenCustomLoadout;
 
-    // Given once -- and given again when the player arrives on a new pawn with an inventory that is completely
-    // empty: something cleared it on the way (off the bus, say), and with FConfiguration::bKeepInventory on what
-    // they carried is meant to stay with them. An empty inventory cannot end up with doubles.
     const bool bFirstKit = GivenCustomLoadout.find(PlayerController) == GivenCustomLoadout.end();
 
     if (PlayerController->WorldInventory && (bFirstKit || Num == 0))
@@ -464,7 +443,6 @@ void AFortPlayerControllerAthena::ServerAcknowledgePossession(UObject* Context, 
         {
             std::wstring n(shortName);
 
-            // A full object path (the 1.8.2 stand-ins below that live in a folder of their own).
             if (!n.empty() && n[0] == L'/')
                 return (const UFortItemDefinition*)FindObject(n.c_str(), UObject::StaticClass());
 
@@ -508,18 +486,15 @@ void AFortPlayerControllerAthena::ServerAcknowledgePossession(UObject* Context, 
             int count;
             int ammoOverride;
 
-            // This build's nearest item, given when `name` is not on it. 1.8.2 has none of the Chapter 2 guns, so
-            // without these the kit gave nothing but ammo and materials (every one of these lookups failed in the
-            // 1.8.2 log). Where the real item exists it is still the one given.
             const wchar_t* standIn;
         };
         static const Entry Loadout[] = {
-            { L"WID_Assault_Stark_Athena_SR_Ore_T03",    1,   0, L"WID_Assault_AutoHigh_Athena_SR_Ore_T03" },          // 1.8.2: legendary SCAR
-            { L"WID_Shotgun_Standard_Athena_SR_Ore_T03", 1,   0, L"WID_Shotgun_Standard_Athena_UC_Ore_T03" },          // 1.8.2: the best pump it has
-            { L"WID_Sniper_Heavy_Athena_SR_Ore_T03",     1,   0, L"WID_Sniper_BoltAction_Scope_Athena_SR_Ore_T03" },   // 1.8.2: legendary bolt-action
+            { L"WID_Assault_Stark_Athena_SR_Ore_T03",    1,   0, L"WID_Assault_AutoHigh_Athena_SR_Ore_T03" },          
+            { L"WID_Shotgun_Standard_Athena_SR_Ore_T03", 1,   0, L"WID_Shotgun_Standard_Athena_UC_Ore_T03" },          
+            { L"WID_Sniper_Heavy_Athena_SR_Ore_T03",     1,   0, L"WID_Sniper_BoltAction_Scope_Athena_SR_Ore_T03" },   
 
-            { L"WID_Boss_Adventure_GH",                1,   0, nullptr },                                          // no grappler of any kind on 1.8.2
-            { L"Athena_ChillBronco",                     6,   0, L"/Game/Athena/Items/Consumables/PurpleStuff/Athena_PurpleStuff.Athena_PurpleStuff" },   // 1.8.2: slurp juice
+            { L"WID_Boss_Adventure_GH",                1,   0, nullptr },                                          
+            { L"Athena_ChillBronco",                     6,   0, L"/Game/Athena/Items/Consumables/PurpleStuff/Athena_PurpleStuff.Athena_PurpleStuff" },   
 
             { L"AthenaAmmoDataBulletsMedium",            300, 0, nullptr },
             { L"AthenaAmmoDataShells",                   100, 0, nullptr },
@@ -532,8 +507,6 @@ void AFortPlayerControllerAthena::ServerAcknowledgePossession(UObject* Context, 
             { L"MetalItemData",                          10,  0, nullptr },
         };
 
-        // The grappler's magazine comes out of the data table, so the 999 hotfix has to be in before
-        // ClipOf() reads it -- otherwise the loadout hands out a grappler with the stock 10 rounds.
         BotAI::EnsureWeaponHotfixes();
 
         static bool bReportedStandIns = false;
@@ -550,7 +523,7 @@ void AFortPlayerControllerAthena::ServerAcknowledgePossession(UObject* Context, 
 
                 if (Def)
                 {
-                    // never more than the stand-in stacks to (6 chug splashes became 6 slurps in one stack)
+                    
                     const int MaxStack = Def->GetMaxStackSize();
                     if (MaxStack > 0 && Count > MaxStack)
                         Count = MaxStack;
@@ -585,7 +558,6 @@ void AFortPlayerControllerAthena::ServerAcknowledgePossession(UObject* Context, 
         }
     }
 
-    // Everything the player carries onto a quickbar (1.8.2 and older), then what they really ended up with.
     {
         static std::map<void*, int> Possessions;
         const int Times = ++Possessions[(void*)PlayerController];
@@ -985,7 +957,6 @@ void AFortPlayerControllerAthena::ServerCreateBuildingActor(UObject* Context, FF
     if (Building->HasTeamIndex())
         Building->TeamIndex = Building->Team;
 
-    // ---- BUILD GRID LOG (every human/player piece) -----------------------------------------
     {
         static int GBuildLogCount = 0;
         GBuildLogCount++;
@@ -995,7 +966,6 @@ void AFortPlayerControllerAthena::ServerCreateBuildingActor(UObject* Context, FF
         if (PS && PS->HasbIsABot() && PS->bIsABot)
             bIsBot = true;
 
-        // Prefer the spawned actor's class name (avoids TSubclassOf cast issues)
         static char ClassBuf[256];
         ClassBuf[0] = '?'; ClassBuf[1] = 0;
         if (Building)
@@ -1034,7 +1004,6 @@ void AFortPlayerControllerAthena::ServerCreateBuildingActor(UObject* Context, FF
             DistToMultiple(BuildLoc.X, 128.0), DistToMultiple(BuildLoc.Y, 128.0), DistToMultiple(BuildLoc.Z, 128.0));
         fflush(stdout);
     }
-    // ----------------------------------------------------------------------------------------
 
     if (!PlayerController->bBuildFree && !FConfiguration::bInfiniteMats)
     {
@@ -1563,16 +1532,12 @@ void AFortPlayerControllerAthena::ClientOnPawnDied(AFortPlayerControllerAthena* 
             PlayerState->OnRep_DeathInfo();
         }
 
-        // Who gets this elimination -- or nobody -- is decided in one place for every death (BotAI.cpp, SettleElimination),
-        // so the bot code's own dead-bot sweep can no longer give the same death out a second time (the last log's 113 kills
-        // with 99 bots), and the "Eliminated" popup gets the victim's name the way 1.8.2's ClientReportKill wants it. The
-        // game's own killer is handed over as it is; SettleElimination checks it (not the victim, not before the match).
         AFortPlayerStateAthena* NamedKiller = nullptr;
 
         if (KillerPlayerState && KillerPawn && KillerPawn->Controller && KillerPawn->Controller != PlayerController)
             NamedKiller = KillerPlayerState;
         else if (KillerPlayerState && !KillerPawn && KillerPlayerState != PlayerState)
-            NamedKiller = KillerPlayerState;   // their body is already gone (both went down together) -- still their kill
+            NamedKiller = KillerPlayerState;   
 
         const bool bCredited = BotAI::SettleEliminationFromGameReport(PlayerState, NamedKiller, DeadPawn, KillerPawn, DeathReport.DamageCauser);
 
@@ -1728,7 +1693,6 @@ void AFortPlayerControllerAthena::ClientOnPawnDied(AFortPlayerControllerAthena* 
             KillerPlayerState->AbilitySystemComponent->NetMulticast_InvokeGameplayCueExecuted(Tag, *PredictionKey, Handle);
             free(PredictionKey);
 
-            // Siphon: grant SiphonAmount total (fill health first, overflow to shield). Cap both at 100.
             auto Health = KillerPawn->GetHealth();
             auto Shield = KillerPawn->GetShield();
             float Remaining = (float)FConfiguration::SiphonAmount;
@@ -1881,7 +1845,7 @@ void AFortPlayerControllerAthena::InternalPickup(FFortItemEntry* PickupEntry)
                 ServerExecuteInventoryItem(Item->ItemEntry.ItemGuid);
                 if (VersionInfo.FortniteVersion < 3)
                 {
-                    // a bot's controller has no quickbars (see AFortInventory::GiveItem)
+                    
                     if (QuickBars)
                     {
                     auto& QuickBar = (AFortInventory::IsPrimaryQuickbar(Item->ItemEntry.ItemDefinition) || Item->ItemEntry.ItemDefinition->ItemType == EFortItemType::GetWeaponHarvest())
@@ -2108,8 +2072,6 @@ void AFortPlayerControllerAthena::ServerCheat(UObject* Context, FFrame& Stack)
         while (!command.empty() && (command.front() == '/' || command.front() == '\\'))
             command.erase(command.begin());
 
-        // What the 1.8.2 client DLL's own screen showed -- its killfeed, the "Eliminated" popup, the storm timer -- and F7
-        // turbo building, written into this server's log as [CLIENT] lines.
         if (command == "clientlog")
         {
             const size_t Space = fullCommand.find(' ');
@@ -2409,7 +2371,7 @@ void AFortPlayerControllerAthena::ServerCheat(UObject* Context, FFrame& Stack)
 
         if (command == "startaircraft")
         {
-            // Typing this by hand is a deliberate override, so it lifts the hold.
+            
             BotAI::ClearBusForLaunch("someone typed \"cheat startaircraft\"");
 
             if (UFortGameStateComponent_BattleRoyaleGamePhaseLogic::GetDefaultObj())

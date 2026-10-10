@@ -29,8 +29,6 @@ namespace PlaceDump
 
     static std::vector<FPlace> GPlaces;
 
-    // One entry per "# POI" file that was read: the name it was saved under and the middle of
-    // everywhere that file walked. This is what lets a place be asked for by name later.
     struct FLandmark
     {
         std::string Name;
@@ -42,7 +40,6 @@ namespace PlaceDump
 
     static std::vector<FLandmark> GLandmarks;
 
-    // "Stark Industries.txt", "stark_industries", "STARKINDUSTRIES" -- all the same place.
     static std::string Simplify(const std::string& In)
     {
         std::string Out;
@@ -557,9 +554,6 @@ namespace PlaceDump
         if (!FConfiguration::bUsePlaceDump)
             return;
 
-        // The recorded places that ship inside the server. These go in first so a fresh copy knows
-        // its way around without anything being copied onto the disk; whatever is in the folder is
-        // then read on top and adds to them.
         int BakedPlaced = 0;
 
         for (int a = 0; a < BakedPlaces::AreaCount; a++)
@@ -616,9 +610,6 @@ namespace PlaceDump
             GLandmarks.push_back(Mark);
         }
 
-        // And the walks between those areas, which is what joins them up. Without these the areas
-        // above are islands: a bot could find its way around one POI and had no idea how to reach
-        // another. These are not given names -- they are roads, not places.
         int BakedRoutes = 0;
 
         for (int r = 0; r < BakedPlaces::RouteCount; r++)
@@ -697,9 +688,6 @@ namespace PlaceDump
 
                 FilesRead++;
 
-                // A "# POI" file is somebody walking a named place on purpose. A "# Play" file is a
-                // whole match, most of which is spent in the air. That difference decides whether the
-                // ground flag on each line is worth believing -- see below.
                 bool bPoiFile = false;
 
                 std::string FileName = Find.cFileName;
@@ -737,13 +725,6 @@ namespace PlaceDump
 
                     LinesRead++;
 
-                    // A match recording spends most of its time in the air, so a point that is not
-                    // on the ground is no use for walking and gets dropped. A POI recording is the
-                    // opposite: somebody deliberately walked one place, and the ground flag on those
-                    // lines is meaningless -- every one of the recorded POIs came in reading zero,
-                    // which meant the whole file was thrown away and the places never appeared. So
-                    // the flag is only trusted for match recordings. The height ceiling still applies
-                    // either way.
                     const bool bTooHigh = Z > FConfiguration::PlaceDumpHeightCeiling;
 
                     if (bTooHigh || (!bGround && !bPoiFile))
@@ -926,8 +907,6 @@ namespace PlaceDump
         {
             const std::string Have = Simplify(GLandmarks[i].Name);
 
-            // An exact name first, then a file whose name contains what was asked for, so
-            // "Stark Industries" still finds "Stark Industries POI 2.txt".
             if (Have == Wanted)
             {
                 Out = FVector{};
@@ -980,8 +959,6 @@ namespace PlaceDump
 
         int Written = 0;
 
-        // Spread them around the place rather than stacking everyone on one doorstep: walk the
-        // candidate list at a stride so consecutive bots get spots from different parts of it.
         const int Stride = (int)Candidates.size() / (Count > 0 ? Count : 1);
         const int Step = Stride > 0 ? Stride : 1;
 
@@ -1023,8 +1000,6 @@ namespace PlaceDump
         printf("[PlaceDump] %d places recorded, in %d separate area(s). The biggest holds %d of them (%.0f%%).\n",
                Total, GIslandCount, GConnectedCount, Reachable);
 
-        // Bots no longer walk these as routes (the "navmesh" was taken out of their movement); the
-        // places are only used to find the hot-drop spot now. Say so, so the log does not claim otherwise.
         printf("[PlaceDump] Bots do NOT follow these routes any more -- movement is straight-line; "
                "the recorded places are only used to find the hot-drop spot.\n");
 

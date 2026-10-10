@@ -9,11 +9,11 @@
 #include "../Public/NoKillerMessages.h"
 #include "../../FortniteGame/Public/FortGameMode.h"
 #include "../../FortniteGame/Public/BattleRoyaleGamePhaseLogic.h"
-// For reading the weapon a bot has in its hands when it dies, so that gets dropped too.
+
 #include "../../FortniteGame/Public/FortWeapon.h"
 #include "../../FortniteGame/Public/BuildingSMActor.h"
 #include "../../FortniteGame/Public/FortPlayerControllerAthena.h"
-// The game's own loot tables (TierDataMap, ChooseLootForContainer) -- what the bots' loot comes from (round 5).
+
 #include "../../FortniteGame/Public/FortLootPackage.h"
 
 #include "../Plugins/CrashReporter/Public/CrashReporter.h"
@@ -33,14 +33,10 @@
 
 extern bool GStormMapDataWasRepaired;
 
-// The game's own AFortPlayerState::ApplyCharacterCustomization (FortGameMode.cpp finds it) -- what this server already
-// uses to put the real player's look on their pawn on builds without UpdatePlayerCustomCharacterPartsVisualization.
 extern uint64_t ApplyCharacterCustomization;
 
 uint8 ToDeathCause(AFortPlayerPawnAthena* Pawn, FGameplayTagContainer& DeathTags, bool bDBNO);
 
-// The game's own AFortPlayerControllerAthena::EnterAircraft (Finders.cpp) -- read, never called, to find where the
-// game marks a player as off the bus (see MarkBotOffTheBus).
 uint64 FindEnterAircraft();
 
 static void LogLine(const char* Fmt, ...)
@@ -82,7 +78,6 @@ namespace BotAI
 
     static const UFortItemDefinition* FindItemDefByName(const wchar_t* name);
 
-    // The bots' loot from the game's own loot tables (round 5), and the old fixed kit when those cannot give a gun.
     static int GiveBotLootpoolKit(AFortPlayerControllerAthena* Controller, AFortPlayerStateAthena* PlayerState);
     static void NoteFixedBotKit(AFortPlayerStateAthena* PlayerState, const char* Why);
     static std::string GiveBotSpareRounds(AFortInventory* Inventory, const UFortItemDefinition* Gun);
@@ -112,60 +107,55 @@ namespace BotAI
         int CooldownTicksLeft = 0;
         bool bFiring = false;
 
-        int RoundsSinceReload = 0;   // reloads themselves are TickBotReload's (BotReloads), not the fight's
+        int RoundsSinceReload = 0;   
     };
 
     static std::map<void*, FBotFireState> BotFire;
 
-    // A bot's reload (TickBotReload), kept apart from its fight so that a fight ending does not throw the reload away.
     struct FBotReload
     {
         bool bActive = false;
-        bool bGameReload = false;     // the game's own reload is doing it
-        void* Weapon = nullptr;       // the gun being reloaded (compared; read only while it is still in the bot's hands)
+        bool bGameReload = false;     
+        void* Weapon = nullptr;       
         int RoundsBefore = -1;
         int Magazine = 0;
         float StartedAt = 0.f;
-        float Duration = 0.f;         // the gun's own reload time
+        float Duration = 0.f;         
         const char* Why = "";
-        float NoFightSince = -1.f;    // when it last had nobody to fight (for topping off)
-        float ReloadFlagSince = -1.f; // the game's "reloading" flag up with no reload of ours on
-        float EquipFlagSince = -1.f;  // the game's "equipping" flag up
-        void* MagazineOf = nullptr;   // the gun MagazineSize was read from (read once per gun, not every tick)
+        float NoFightSince = -1.f;    
+        float ReloadFlagSince = -1.f; 
+        float EquipFlagSince = -1.f;  
+        void* MagazineOf = nullptr;   
         int MagazineSize = 0;
     };
 
-    static std::map<void*, FBotReload> BotReloads;   // bot pawn -> its reload
+    static std::map<void*, FBotReload> BotReloads;   
 
-    // ---- the body of a player-controller bot (every bot on 1.8.2) -- walked by TickBotBodies ----
     struct FBotBody
     {
-        float Clock = 0.f;          // this pawn's own ServerMove time stamp
-        bool bHasGoal = false;      // where the bot code last told it to walk (BotMoveTo)...
+        float Clock = 0.f;          
+        bool bHasGoal = false;      
         FVector Goal{};
-        float AcceptRadius = 100.f; // ...and how close counts as there
-        bool bScripted = false;     // its real movement did not move it, so this one is moved by script
-        bool bChecked = false;      // the "does real movement bring it down" check is done for this one...
-        float WatchSince = -1.f;    // ...or, while it runs: when it started...
-        float WatchZ = 0.f;         // ...and the highest it has been since
-        void* Owner = nullptr;      // the bot controller this pawn belongs to (a new owner starts the body over)
-        bool bGroundKnown = false;  // scripted: the ground under it, and where that was looked up
+        float AcceptRadius = 100.f; 
+        bool bScripted = false;     
+        bool bChecked = false;      
+        float WatchSince = -1.f;    
+        float WatchZ = 0.f;         
+        void* Owner = nullptr;      
+        bool bGroundKnown = false;  
         double GroundZ = 0.0;
         FVector GroundFor{};
-        bool bOnGround = false;     // scripted: its feet are known to be on the ground
+        bool bOnGround = false;     
     };
 
-    static std::map<void*, FBotBody> BotBodies;   // bot pawn -> its body
+    static std::map<void*, FBotBody> BotBodies;   
 
-    // A bot whose controller is a real Athena_PlayerController (spawned the Magnesium way) rather than an AI
-    // controller. On 1.8.2 that is every bot.
     static bool IsPlayerControllerBot(AActor* Controller)
     {
         static auto PlayerControllerClass = AFortPlayerControllerAthena::StaticClass();
         return Controller && PlayerControllerClass && Controller->IsA(PlayerControllerClass);
     }
 
-    // A reflected bool by name -- a real bool or one bit of a bitfield. A real bool gets exactly 1 or 0.
     static bool SetBoolByName(UObject* Object, const char* Name, bool bValue)
     {
         auto Prop = Object ? Object->GetProperty(Name, 0x20000) : nullptr;
@@ -190,7 +180,6 @@ namespace BotAI
         return true;
     }
 
-    // 1 or 0 -- or -1 when the object has no bool by that name.
     static int ReadBoolByName(const UObject* Object, const char* Name)
     {
         auto Prop = Object ? Object->GetProperty(Name, 0x20000) : nullptr;
@@ -206,11 +195,6 @@ namespace BotAI
         return (GetFromOffset<uint8>(Object, Offset) & Mask) ? 1 : 0;
     }
 
-    // A bot is a player controller with no game client behind it, so nothing ever tells the server that it has
-    // finished loading. The game does not let a player like that out of the bus: in the 1.8.2 log the game's own
-    // jump turned every bot down for the whole drop, until the bus reached the end of its drop zone and threw all
-    // 99 of them out at once, onto the same spot. These are the flags Magnesium sets on the bots it spawns
-    // (MarkSyntheticParticipantReady).
     static void MarkBotReadyLikeAPlayer(AFortPlayerControllerAthena* Controller, AFortPlayerStateAthena* PlayerState, bool bHasPawn)
     {
         if (!Controller)
@@ -242,28 +226,17 @@ namespace BotAI
         }
     }
 
-    // ---- marking a bot as off the bus (Magnesium's "legacy aircraft exit latch") -------------------------------
-    //
-    // A player who leaves the bus is marked on their controller twice: "in the aircraft" goes off and "has exited
-    // the aircraft" goes on. Before 11.00 neither byte is reflected, so they are found the way Magnesium finds them:
-    // in the game's own EnterAircraft, which checks "has exited" (and warns "is attempting to enter aircraft after
-    // having already exited") and then "in the aircraft" -- two byte compares on the controller, one byte apart, a
-    // little before bReadyToStartMatch. Exactly one such pair has to be found or nothing is ever written.
-    //
-    // A bot the game will not let off the bus gets its pawn made by hand; this is what makes the game agree it is
-    // off, so the bus has nobody left to throw out at the end of its drop zone. (In the 1.8.2 logs that is where 94
-    // bots got a broken pawn with no health and were all counted dead in one tick.)
     struct FBusExitLatch
     {
         bool bResolved = false;
         bool bSupported = false;
-        uint32 ExitedOffset = 0;   // "has exited the aircraft"; "in the aircraft" is the byte before it
+        uint32 ExitedOffset = 0;   
         uint32 ReadyOffset = 0;
         uint8 ReadyMask = 0;
-        int Written = 0;           // the two bytes set to "off the bus"
-        int Applied = 0;           // ...and the game's IsInAircraft then said "not on board"
-        int Refused = 0;           // the two bytes were not a pair of bools -- not written
-        int StillAboard = 0;       // written, but IsInAircraft still said "on board" (kept anyway, as Magnesium does)
+        int Written = 0;           
+        int Applied = 0;           
+        int Refused = 0;           
+        int StillAboard = 0;       
         int Logged = 0;
     };
 
@@ -276,7 +249,6 @@ namespace BotAI
         size_t Size = 0;
     };
 
-    // cmp byte ptr [reg + disp32], 0 -- with an optional REX prefix, and a SIB byte for the rsp/r12-based form.
     static bool DecodeCmpByteZero(const uint8* Code, size_t Remaining, FCmpByteZero& Out)
     {
         if (!Code || Remaining < 7)
@@ -298,7 +270,6 @@ namespace BotAI
 
         const uint8 ModRM = Code[Cursor++];
 
-        // mod = 10 (disp32), reg = 7 (CMP)
         if ((ModRM & 0xF8) != 0xB8)
             return false;
 
@@ -338,7 +309,6 @@ namespace BotAI
         return true;
     }
 
-    // Did the function copy its first argument (rcx, the controller) into this register before the compare?
     static bool FunctionSavesThisInRegister(const uint8* Code, size_t End, uint8 ExpectedRegister)
     {
         if (!Code || ExpectedRegister > 15)
@@ -377,7 +347,6 @@ namespace BotAI
         return false;
     }
 
-    // Every page of [Start, Start + Size) can be read.
     static bool MemoryIsReadable(const uint8* Start, size_t Size)
     {
         if (!Start || !Size)
@@ -398,7 +367,7 @@ namespace BotAI
             return Latch.bSupported;
 
         if (!Controller)
-            return false;   // only ever looked for with a real controller in hand
+            return false;   
 
         Latch.bResolved = true;
 
@@ -450,8 +419,6 @@ namespace BotAI
             if (!DecodeCmpByteZero(Code + FirstAt, ScanSize - FirstAt, First))
                 continue;
 
-            // "has exited" sits in the same block of bools just before bReadyToStartMatch, and its check comes
-            // shortly before the warning.
             if (First.Displacement == 0 || First.Displacement >= ReadyOffset || ReadyOffset - First.Displacement > 0x40 ||
                 FirstAt >= WarningAt || WarningAt - FirstAt > 0x100 ||
                 !FunctionSavesThisInRegister(Code, FirstAt, First.BaseRegister))
@@ -460,7 +427,6 @@ namespace BotAI
             const size_t PairEnd = (FirstAt + 0x300 < ScanSize) ? FirstAt + 0x300 : ScanSize;
             bool bFoundPair = false;
 
-            // ...and "in the aircraft" (the byte before it) is checked a little after.
             for (size_t SecondAt = FirstAt + First.Size; SecondAt + 7 <= PairEnd; SecondAt++)
             {
                 FCmpByteZero Second{};
@@ -501,12 +467,6 @@ namespace BotAI
         return true;
     }
 
-    // Marks one bot as off the bus, the way Magnesium does: the two bytes are written ("in the aircraft" 0, "has exited"
-    // 1) as long as both read as plain bools, and they are kept. Only a bot the game itself says is on board
-    // (IsInAircraft) is touched. Then the game is asked again: true when it now says "not on board". (When it still
-    // says "on board", the bytes stay anyway -- the bus's own exit at the end of its drop zone may go by them even if
-    // IsInAircraft does not -- and the first three times the log shows both bytes and both answers, so it is clear
-    // which it is.) Why: what happened, for the log.
     static bool MarkBotOffTheBus(AFortPlayerControllerAthena* Controller, const char** Why)
     {
         const char* Ignored = nullptr;
@@ -544,7 +504,6 @@ namespace BotAI
         const uint8 InAircraft = State[0];
         const uint8 HasExited = State[1];
 
-        // Both are plain bools: anything above 1 means these are not the two bytes on this controller.
         if (InAircraft > 1 || HasExited > 1)
         {
             Latch.Refused++;
@@ -596,36 +555,27 @@ namespace BotAI
 
     static int GWeaponsReissued = 0;
 
-    // Locking on, shooting only what it can see, and the extra misses -- for the [LOCK] log line.
     static int GLocksMade = 0;
     static int GLocksEnded = 0;
     static int GBurstsCutOutOfSight = 0;
     static int GTicksHeldFireOutOfSight = 0;
     static int GAimDeliberateMisses = 0;
     static int GChaseHops = 0;
-    static std::map<void*, std::string> BotLockedOnName;   // bot pawn -> who it is locked onto
+    static std::map<void*, std::string> BotLockedOnName;   
 
-    // bot pawn -> the ONE pawn it is locked onto (also read by the wall building, to face the wall at them)
     static std::map<void*, AFortPlayerPawnAthena*> BotCombatTarget;
 
-    // Where its target was the last time it could see them -- it goes there first when they drop out of sight,
-    // instead of walking straight at them through a hill.
     static std::map<void*, FVector> BotLastSeenSpot;
 
-    // Bots standing their ground in a fight (their old walk was dropped once).
     static std::set<void*> BotStoppedForFight;
 
-    // Controllers that currently have an aim focus from us (cleared when they stop fighting).
     static std::set<void*> BotHasFocus;
 
-    // ---- Checking what really happens, not what the code thinks happens ----
-    // [TRIGGER]: every tick a bot's gun loses rounds, was that one of its own bursts or not?
-    static std::map<void*, std::pair<void*, int>> BotAmmoSeen;   // bot pawn -> (weapon, rounds in it last tick)
-    static std::map<void*, int> BotTriggerUpTick;                // bot pawn -> tick the bot code last let go of the trigger
+    static std::map<void*, std::pair<void*, int>> BotAmmoSeen;   
+    static std::map<void*, int> BotTriggerUpTick;                
     static int GShotTicksOurs = 0;
     static int GShotTicksStray = 0;
 
-    // [AIM]: while a burst is going, is the gun still pointed where the bot code aimed it?
     struct FBotAimRecord
     {
         double Yaw = 0.0;
@@ -637,11 +587,9 @@ namespace BotAI
     static double GAimOffSum = 0.0;
     static double GAimOffMax = 0.0;
 
-    // [HITS]: bot-on-bot hits -- on the target the shooter is locked onto, or on somebody else?
     static int GHitsOnLockedTarget = 0;
     static int GHitsOnSomebodyElse = 0;
 
-    // [EYES]: ticks the game's line-of-sight said "visible" but the ground was in the way, so no shot.
     static int GTerrainBlocks = 0;
 
     static const uint8 GamePhase_Aircraft = 2;
@@ -761,8 +709,6 @@ namespace BotAI
         }
     }
 
-    // Tidies a raw byte run into something printable, and says whether it reads like a name somebody
-    // actually chose rather than an internal id.
     static bool LooksLikeAName(const std::string& Name)
     {
         if (Name.size() < 3 || Name.size() > 32)
@@ -788,14 +734,12 @@ namespace BotAI
         if (Letters == 0)
             return false;
 
-        // A long run of nothing but hex digits is an account id, not a name.
         if (Name.size() >= 16 && HexDigits == (int)Name.size())
             return false;
 
         return true;
     }
 
-    // The longest stretch of ordinary printable characters, one byte per character.
     static std::string LongestAnsiRun(const uint8* Bytes, int Count)
     {
         std::string Best;
@@ -823,9 +767,6 @@ namespace BotAI
         return Best;
     }
 
-    // The same, for text stored two bytes per character (a printable byte followed by a zero). The
-    // characters can start on either an even or an odd byte depending on what precedes them, so both
-    // alignments are tried and the better one wins.
     static std::string LongestWideRun(const uint8* Bytes, int Count)
     {
         std::string Best;
@@ -858,8 +799,6 @@ namespace BotAI
         return Best;
     }
 
-    // The account a player signed in with. The game's own logging prints this correctly even when the
-    // replicated display name comes through mangled, so it is the more trustworthy of the two.
     static std::string NameFromUniqueId(AFortPlayerStateAthena* PlayerState)
     {
         if (!PlayerState)
@@ -899,10 +838,8 @@ namespace BotAI
         std::string Narrow = LongestAnsiRun(Bytes, Count);
         std::string Wide = LongestWideRun(Bytes, Count);
 
-        // Whichever spelling produced the longer readable run is the one the id is actually stored in.
         std::string Picked = Wide.size() > Narrow.size() ? Wide : Narrow;
 
-        // Backends tend to prefix the id, e.g. "MCP:someone". Keep the part after the colon.
         const size_t Colon = Picked.find_last_of(':');
 
         if (Colon != std::string::npos && (Picked.size() - Colon - 1) >= 3)
@@ -924,8 +861,6 @@ namespace BotAI
         if (!PlayerState)
             return std::string();
 
-        // Bots are named by us, so their stored name is always right. For real people the stored name
-        // has been coming through scrambled, so ask the account they logged in with first.
         const bool bIsBot = PlayerState->HasbIsABot() && PlayerState->bIsABot;
 
         if (!bIsBot)
@@ -939,9 +874,6 @@ namespace BotAI
         return NameAsStored(PlayerState);
     }
 
-    // The name exactly as the game stores (and replicates) it: PlayerNamePrivate on the builds that have it, and
-    // APlayerState::PlayerName -- an FString at 0x390 -- on the ones before. 1.8.2 has no PlayerNamePrivate at all, which
-    // is why every name in the last log came out as '' and the "Eliminated" popup mostly had nobody to name.
     static const FString* PlayerNameField(AFortPlayerStateAthena* PlayerState)
     {
         if (!PlayerState)
@@ -1123,8 +1055,6 @@ namespace BotAI
         LogLine("[ZONE] Storm running again -- it starts closing in 30 seconds.");
     }
 
-    // Filled in by the hotfix below. Anything in here is a grappler as far as this build is
-    // concerned, which is what the top-up recognises rather than matching names all over again.
     static std::set<const UFortItemDefinition*> GrapplerDefinitions;
 
     static void ApplyWeaponHotfixes()
@@ -1134,7 +1064,6 @@ namespace BotAI
         if (bDone)
             return;
 
-        // 1.8.2: modern grapplers / Boss Adventure GH do not exist
         static const wchar_t* Grapplers[] = {
             nullptr
         };
@@ -1202,12 +1131,6 @@ namespace BotAI
                 "backend RowUpdate does, applied here instead.", Wanted, Patched, Found);
     }
 
-    // The data-table hotfix gives every grappler handed out from then on a 999 magazine, but it
-    // cannot reach one that is already sitting in somebody's inventory. The bus leaving hands
-    // everyone a fresh pawn and a fresh inventory, and whatever the grappler comes back with is
-    // whatever the game felt like -- which is how a 999 grappler turns back into a 10 on the drop.
-    // So any grappler anyone is carrying gets topped straight back up, for the whole match.
-    // Defined further down, next to the rest of the reloading code.
     static int32* WeaponAmmoCount(AActor* Weapon);
 
     static void TopUpGrapplers(AFortGameStateAthena* GameState, int TickNow)
@@ -1217,7 +1140,6 @@ namespace BotAI
         if (Wanted <= 0 || GrapplerDefinitions.empty() || !GameState || !GameState->HasPlayerArray())
             return;
 
-        // Cheap: a couple of times a second is plenty and nobody can empty 999 rounds in that time.
         static int NextCheck = 0;
 
         if (TickNow < NextCheck)
@@ -1236,9 +1158,6 @@ namespace BotAI
             if (!PS)
                 continue;
 
-            // Real players only. A bot's controller is an AI controller with no WorldInventory -- reading one
-            // off it reads past the end of the object, which is what faulted about twice a second and threw
-            // away the rest of the bot tick each time (the [GUARD] / "Fault inside a guarded section" lines).
             if (PS->HasbIsABot() && PS->bIsABot)
                 continue;
 
@@ -1264,8 +1183,6 @@ namespace BotAI
                 if (GrapplerDefinitions.find(Entry.ItemDefinition) == GrapplerDefinitions.end())
                     continue;
 
-                // Only ever raise it. Taking somebody's count down would be a worse bug than the
-                // one this is here to fix.
                 if (Entry.LoadedAmmo >= Wanted)
                     continue;
 
@@ -1275,8 +1192,6 @@ namespace BotAI
                 ToppedUp++;
             }
 
-            // And the one actually in their hands, which keeps its own count separate from the
-            // inventory entry.
             auto Pawn = (AFortPlayerPawnAthena*)Controller->Pawn;
 
             if (Pawn && Pawn->HasCurrentWeapon() && Pawn->CurrentWeapon)
@@ -1302,10 +1217,6 @@ namespace BotAI
         }
     }
 
-
-    // Which pawn we last put on 100/100 for each real player, and how long we keep insisting on it.
-    // Jumping out of the bus hands the player a brand new pawn, and a new pawn starts on 100 health
-    // with no shield at all -- so this has to follow the pawn, not the player.
     static std::map<void*, void*> HumanPawnToppedUp;
     static std::map<void*, int> HumanTopUpUntilTick;
 
@@ -1364,11 +1275,6 @@ namespace BotAI
 
     static bool bBotSpawningPaused = false;
 
-    // The bus is not allowed off the ground until something deliberately clears it. Every route that
-    // can start the bus -- our own countdown, "cheat startaircraft", the GUI button, the net driver's
-    // warmup timer, and the game's own internal timer -- all end up in AFortGameMode::StartAircraftPhase,
-    // and that function refuses to run unless this latch is set. Gating the callers one at a time never
-    // worked because there was always one more caller.
     static bool bBusClearedForLaunch = false;
 
     void ClearBusForLaunch(const char* Why)
@@ -1400,8 +1306,7 @@ namespace BotAI
 
         if (bPaused)
         {
-            // Pausing takes the clearance away again, so a countdown that was already running cannot
-            // sneak the bus out from under the pause.
+
             bBusClearedForLaunch = false;
             BusCountdownStart = -1.f;
             LastBusSecondAnnounced = -1;
@@ -1472,15 +1377,12 @@ namespace BotAI
 
     static std::map<void*, std::pair<void*, int>> ShotAtBy;
 
-    // When a human damages a bot, we remember that human so the bot returns fire even from long range.
-    // Key = bot controller, value = { human playerstate, tick when damaged }
     static std::map<void*, std::pair<void*, int>> AggroedByHuman;
 
-    // Tick when a bot first started taking damage in the current engagement (for reactive building).
     static std::map<void*, int> BotUnderFireSince;
     static std::set<void*> BotAlreadyBuiltWall;
 
-    static int GElimsFromLedger = 0;   // bot deaths the dead-bot sweep traced to real damage (FindBotKiller)
+    static int GElimsFromLedger = 0;   
 
     static std::map<void*, FVector> MovementProbe;
 
@@ -1492,9 +1394,7 @@ namespace BotAI
 
     static std::set<void*> SeenAliveBots;
 
-    // A bot whose pawn the bus broke and that is getting a new one (KeepBotsOnTheirOwnPawns): still in the match,
-    // for a few seconds, whatever its broken pawn says -- so nothing counts it dead before its new pawn is there.
-    static std::map<void*, float> BotBeingFixedUntil;   // bot controller -> until when
+    static std::map<void*, float> BotBeingFixedUntil;   
 
     static bool BotIsBeingFixed(void* Controller)
     {
@@ -1535,12 +1435,6 @@ namespace BotAI
         int Humans = 0;
     };
 
-    // Is this player still in the match? Their pawn being up says yes, and a pawn that is down says no. But NO pawn
-    // at all is what the battle bus looks like: when the bus leaves, the game takes every passenger's pawn away --
-    // on 1.8.2 the bots' as well, because they are real player controllers -- and a player who has not been put on
-    // the island yet has none either. Such a player is still in as long as the game keeps them in its AlivePlayers
-    // list and they have not been eliminated. Counting pawns only is what ended the 1.8.2 match the moment the real
-    // player jumped: theirs was the one pawn in the sky, so the win check saw "one player left standing".
     static bool PlayerIsStillIn(AFortGameMode* GameMode, AFortPlayerStateAthena* PS, bool* OutOnTheBus = nullptr)
     {
         if (OutOnTheBus)
@@ -1893,16 +1787,8 @@ namespace BotAI
 
     static std::map<void*, AFortPickupAthena*> BotLootTargets;
 
-    // Every bot the game is still carrying down under a glider, and the height it was last seen at.
     static std::map<void*, float> GlidingBots;
     static std::map<void*, int> GlidingSettledFor;
-
-    // ---- gliders --------------------------------------------------------------------------------------
-    //
-    // Each bot flies one of these, picked when it leaves the bus. The glider is opened with the game's
-    // own ForceOpenParachuteAndOverrideGlider ("force the glider open, with this glider"), which also
-    // makes it the glider everybody sees. If that is not on this build, or does not open it, the glider
-    // is opened the way the build where gliding worked opened it: bIsParachuteOpen and its OnRep.
 
     class BFortPlayerPawn : public UObject
     {
@@ -1923,8 +1809,8 @@ namespace BotAI
         L"Glider_ID_080_PrairiePusher",
     };
 
-    static std::vector<const UObject*> BotGliderChoices;   // the ones found on this build
-    static std::map<void*, const UObject*> BotGliderOf;    // pawn -> the glider it flies
+    static std::vector<const UObject*> BotGliderChoices;   
+    static std::map<void*, const UObject*> BotGliderOf;    
 
     static const UObject* PickBotGlider()
     {
@@ -1969,8 +1855,6 @@ namespace BotAI
             LogLine("[GLIDE] %d of the %d bot gliders are on this build%s%s.", (int)BotGliderChoices.size(), Listed,
                     Missing.empty() ? "" : " -- not found: ", Missing.c_str());
 
-            // Round 5: every other glider this server has loaded as well (the last log found only Umbrella_Silver, so all 99
-            // bots flew the same one).
             if (GliderItemClass)
             {
                 const size_t Named = BotGliderChoices.size();
@@ -2008,7 +1892,6 @@ namespace BotAI
         return BotGliderChoices[(size_t)rand() % BotGliderChoices.size()];
     }
 
-    // What happened to each bot on its way down, so the log can say whether it really glided.
     struct FBotGlide
     {
         float JumpTime = 0.f;
@@ -2022,7 +1905,7 @@ namespace BotAI
         bool bOpenLastTick = false;
     };
 
-    static std::map<void*, FBotGlide> BotGlides;   // pawn -> its trip down
+    static std::map<void*, FBotGlide> BotGlides;   
 
     static int GGlideOpened = 0;
     static int GGlideOpenedByGame = 0;
@@ -2043,13 +1926,11 @@ namespace BotAI
         return Name.empty() ? std::string("a bot") : Name;
     }
 
-    // Opens a bot's glider. Says how it was opened, or "" if it could not be.
     static const char* OpenBotGlider(AFortPlayerPawnAthena* Pawn)
     {
         if (!Pawn || !Pawn->HasbIsParachuteOpen())
             return "";
 
-        // A force-open that never came back last time took the whole tick down with it: not again.
         if (bGliderForceOpenInFlight)
         {
             bGliderForceOpenInFlight = false;
@@ -2074,16 +1955,12 @@ namespace BotAI
                 return "the game's force-open";
         }
 
-        // The way the build where gliding worked opened it.
         Pawn->bIsParachuteOpen = true;
         Pawn->OnRep_IsParachuteOpen(false);
 
         return Pawn->bIsParachuteOpen ? "bIsParachuteOpen" : "";
     }
 
-    // Puts the glider away and ends the skydive on a pawn that is down (also fixes the "stuck in the
-    // skydiving animation on the ground" bug). Only ever for a pawn that is genuinely down: cutting the
-    // glider in mid-air drops them out of the sky.
     static void ForceClearSkydive(AFortPlayerPawnAthena* Pawn)
     {
         if (!Pawn)
@@ -2095,7 +1972,6 @@ namespace BotAI
             Pawn->OnRep_IsParachuteOpen(true);
         }
 
-        // A glider the game forced open has to be let go of as well, or it can come straight back.
         auto Chute = (BFortPlayerPawn*)Pawn;
         if (Chute->HasbIsParachuteForcedOpen() && Chute->bIsParachuteForcedOpen)
         {
@@ -2107,8 +1983,6 @@ namespace BotAI
         {
             Pawn->bIsSkydiving = false;
 
-            // OnRep_IsSkydiving takes the previous value. Called without it, it read its argument from
-            // nowhere and crashed -- every time, so the rest of this never ran.
             bool bWasSkydiving = true;
             Pawn->OnRep_IsSkydiving(bWasSkydiving);
         }
@@ -2119,21 +1993,9 @@ namespace BotAI
             AFortPlayerPawnAthena::EndSkydiving(Pawn);
     }
 
-    // ---- a glider you can see, coming down like one (round 5) --------------------------------------------------
-    //
-    // "can you fix the player ais not gliding". In the last log every bot's glider "opened" -- but only as a flag: 1.8.2 has
-    // no ForceOpenParachuteAndOverrideGlider ("0 with the game's force-open"), and a pawn shows the glider in its cosmetic
-    // loadout, which a bot (no account) never had. So nothing anybody could see opened. And they came down exactly as fast
-    // under it as they had skydived: 12,000 units in 8.5 seconds, about 1,200 a second.
-    //
-    // Now a bot's glider goes into its pawn's (and its controller's) cosmetic loadout the moment it spawns (SpawnBots), and
-    // into any new pawn's it gets off the bus (SendBotToItsLandingSpot), so the glider that opens is one everybody sees; and
-    // while it is open the bot comes down no faster than the game's own glider does (its movement's
-    // ParachuteControlParamsSkydive, read off the bot) -- the [GLIDE] lines say what was read and how fast each bot really
-    // came down, and the client DLL's [CLIENT] glider lines what a player's screen really showed.
-    static int32 GLoadoutGliderOffset = -2;     // FFortAthenaLoadout::Glider
-    static int32 GPawnLoadoutOffset = -2;       // AFortPlayerPawnAthena::CustomizationLoadout
-    static int32 GControllerLoadoutOffset = -2; // AFortPlayerControllerAthena::CustomizationLoadout
+    static int32 GLoadoutGliderOffset = -2;     
+    static int32 GPawnLoadoutOffset = -2;       
+    static int32 GControllerLoadoutOffset = -2; 
     static int GGlidersPutInLoadout = 0;
     static int GGlidersAlreadyInLoadout = 0;
 
@@ -2155,7 +2017,6 @@ namespace BotAI
         return GLoadoutGliderOffset >= 0 && GPawnLoadoutOffset >= 0;
     }
 
-    // The glider the pawn's cosmetic loadout holds (what everybody's game draws when its glider opens), or nullptr.
     static const UObject* GliderInBotLoadout(AFortPlayerPawnAthena* Pawn)
     {
         if (!Pawn || !ResolveLoadoutGlider(Pawn))
@@ -2164,8 +2025,6 @@ namespace BotAI
         return *(const UObject**)((uint8*)Pawn + GPawnLoadoutOffset + GLoadoutGliderOffset);
     }
 
-    // Puts the glider into the bot's cosmetic loadout -- the pawn's, which is what everybody's game shows when its glider
-    // opens, and its controller's -- wherever there is none yet. Says what it did, for the log.
     static const char* PutGliderInBotLoadout(AFortPlayerPawnAthena* Pawn, const UObject* Glider)
     {
         if (!Pawn || !Glider)
@@ -2208,12 +2067,10 @@ namespace BotAI
         return What;
     }
 
-    // How fast this build's own glider comes down -- ParachuteControlParamsSkydive.TerminalVelocity on the bot's movement,
-    // read once (with the skydive's, for the log). 700 a second (the scripted glide's speed) if it cannot be read.
     static bool GGlideSpeedRead = false;
     static float GGlideTerminal = 700.f;
-    static int GGlideHeldTicks = 0;   // ticks a bot under its glider was coming down faster than that, and was held to it
-    static double GGlideRateSum = 0.0; // how fast the bots really came down under their gliders (TickLandings)
+    static int GGlideHeldTicks = 0;   
+    static double GGlideRateSum = 0.0; 
     static int GGlideRateCount = 0;
 
     static float ReadAirTerminalVelocity(UObject* Move, const char* ParamsName)
@@ -2263,7 +2120,6 @@ namespace BotAI
         return GGlideTerminal;
     }
 
-    // Every tick, for a bot whose glider is open, just before its move goes to the game: no faster down than a glider.
     static void HoldBotGlideDescent(AFortPlayerPawnAthena* Pawn)
     {
         if (!Pawn || !Pawn->HasbIsParachuteOpen() || !Pawn->bIsParachuteOpen)
@@ -2271,7 +2127,7 @@ namespace BotAI
 
         auto GlideIt = BotGlides.find((void*)Pawn);
         if (GlideIt == BotGlides.end() || GlideIt->second.OpenTime < 0.f)
-            return;   // only once its glider has been opened (TickParachutes)
+            return;   
 
         auto Move = (Pawn->HasCharacterMovement() && Pawn->CharacterMovement) ? Pawn->CharacterMovement : nullptr;
         if (!Move || !Move->HasVelocity())
@@ -2290,11 +2146,7 @@ namespace BotAI
 
     void TickLandings(UWorld* World)
     {
-        // Pass 1: every bot that is walking on the ground but still has skydive flags gets cleaned up.
-        // This is what fixes the "stuck in skydiving animation on the ground" bug. ON THE GROUND only --
-        // being below a certain height is not the same as being down: that rule cut every glider still
-        // in the air below Z=5000 and dropped the bot the rest of the way. Bots still being tracked down
-        // from the bus are left to pass 2, which logs how they came down.
+
         if (World && World->GameState)
         {
             auto GS = (AFortGameStateAthena*)World->GameState;
@@ -2320,7 +2172,7 @@ namespace BotAI
                         Pawn->CharacterMovement->HasMovementMode())
                     {
                         const uint8 Mode = Pawn->CharacterMovement->MovementMode;
-                        // MOVE_Walking = 1, MOVE_NavWalking = 2
+                        
                         if (Mode == 1 || Mode == 2)
                             bWalking = true;
                     }
@@ -2341,9 +2193,7 @@ namespace BotAI
             }
         }
 
-        // Round 5: a real player's own glide -- what this build's own glider does, to hold the bots' glide up against. Measured
-        // over the first 6 seconds the glider is open (or until it closes), once per real player, for the first 4.
-        static std::map<void*, std::pair<float, float>> HumanGlideStart;   // pawn -> (Z, time) when its glider was first seen open
+        static std::map<void*, std::pair<float, float>> HumanGlideStart;   
         static std::set<void*> HumanGlideMeasured;
         static int HumanGlideLines = 0;
 
@@ -2397,8 +2247,6 @@ namespace BotAI
 
         const float Now = World ? (float)UGameplayStatics::GetTimeSeconds(World) : 0.f;
 
-        // Pass 2: every bot on its way down from the bus. The glider stays open the whole way; it is
-        // only put away once the bot is down.
         for (auto it = GlidingBots.begin(); it != GlidingBots.end();)
         {
             auto Pawn = (AFortPlayerPawnAthena*)it->first;
@@ -2431,13 +2279,11 @@ namespace BotAI
             bool bDown = false;
             const char* Why = "";
 
-            // On the ground, or in the water -- as the game itself says.
             if (Pawn->HasCharacterMovement() && Pawn->CharacterMovement &&
                 Pawn->CharacterMovement->HasMovementMode())
             {
                 const uint8 Mode = Pawn->CharacterMovement->MovementMode;
 
-                // MOVE_Walking = 1, MOVE_NavWalking = 2, MOVE_Swimming = 4
                 if (Mode == 1 || Mode == 2)
                 {
                     bDown = true;
@@ -2450,9 +2296,6 @@ namespace BotAI
                 }
             }
 
-            // Or it has stopped going down: under a glider a bot descends the whole way, so a second and
-            // a half without dropping even 20 units means its feet are on something. (Measured in time,
-            // not ticks, so a slow glide is never mistaken for standing still.)
             if (Height < Glide.LastDescentZ - 20.f)
             {
                 Glide.LastDescentZ = Height;
@@ -2464,7 +2307,6 @@ namespace BotAI
                 Why = "stopped going down";
             }
 
-            // Still "in the air" four minutes after the bus: something is badly wrong, let it go.
             if (!bDown && (Now - Glide.JumpTime) > 240.f)
             {
                 bDown = true;
@@ -2475,7 +2317,7 @@ namespace BotAI
 
             if (!bDown)
             {
-                // Keep the glider open all the way down: if anything closes it in the air, open it again.
+                
                 if (Glide.OpenTime >= 0.f && !bGliderOpen && Now >= Glide.NextReopenTime)
                 {
                     Glide.NextReopenTime = Now + 0.5f;
@@ -2497,7 +2339,6 @@ namespace BotAI
                 continue;
             }
 
-            // Down.
             const bool bWasGliding = bGliderOpen || Glide.bOpenLastTick;
 
             GGlideLanded++;
@@ -2505,7 +2346,6 @@ namespace BotAI
             if (bWasGliding)
                 GGlideLandedGliding++;
 
-            // How fast it really came down under its glider (round 5).
             const float Flown = (Glide.OpenTime >= 0.f) ? Now - Glide.OpenTime : 0.f;
             const float GlideRate = (Flown > 0.5f) ? (Glide.OpenZ - Height) / Flown : -1.f;
 
@@ -2552,7 +2392,6 @@ namespace BotAI
                     "%d re-opened after closing in the air.",
                     GGlideLandedGliding, GGlideLanded, GGlideOpened, GGlideOpenedByGame, GGlideOpenedByFlag, GGlideOpenFailed, GGlideReopened);
 
-            // Round 5: what everybody saw open, and how fast they really came down under it.
             LogLine("[GLIDE] Under their gliders they came down %.0f a second on average (%d bot(s) measured; the game's own glider: %.0f) | "
                     "ticks a bot was coming down faster than a glider and was held to it: %d | gliders put in a bot's cosmetic loadout: %d "
                     "(it had one already: %d).",
@@ -2578,7 +2417,6 @@ namespace BotAI
             auto Pawn = (AFortPlayerPawnAthena*)it->first;
             it = PendingParachuteOpen.erase(it);
 
-            // Already down (or gone): nothing to open.
             if (!Pawn || GlidingBots.find((void*)Pawn) == GlidingBots.end())
                 continue;
 
@@ -2609,8 +2447,6 @@ namespace BotAI
                 auto GliderIt = BotGliderOf.find((void*)Pawn);
                 const UObject* Glider = (GliderIt != BotGliderOf.end()) ? GliderIt->second : nullptr;
 
-                // Round 5: the glider its pawn's cosmetic loadout really holds now (what everybody's game shows), and its
-                // flags as they are.
                 const UObject* InLoadout = GliderInBotLoadout(Pawn);
 
                 LogLine("[GLIDE] '%s' %s its glider (%s) at Z=%.0f, %.1fs after leaving the bus%s%s | its loadout's glider: %s | skydiving: %s, "
@@ -2628,18 +2464,6 @@ namespace BotAI
 
     static bool bBusDeparted = false;
 
-    // The single answer to "is any bot allowed to fight yet". Nothing before the bus leaves, full
-    // stop: our own launch flag AND the game's own phase both have to say the match is running.
-    // Every part of combat -- picking a target, aiming, closing in, pulling the trigger -- goes
-    // through this, and there is a hard stop further down that puts the trigger back up for any bot
-    // that was firing when it turned false.
-    // ---- eyes -------------------------------------------------------------------------------
-    //
-    // Bots used to pick a target purely on distance, which meant they knew about everyone within
-    // range through walls, floors, hills and from directly behind them. Three things now have to be
-    // true before a bot notices somebody, and they are checked in the cheap-to-expensive order.
-
-    // A number that is this bot's own and does not change for the match.
     static uint32 BotPersonalSeed(void* Pawn)
     {
         uint64 Value = (uint64)Pawn;
@@ -2651,8 +2475,6 @@ namespace BotAI
         return (uint32)Value;
     }
 
-    // Is the other pawn in front of this one? A bot that is looking the other way has not seen you.
-    // Anything very close counts regardless -- at that range you hear them.
     static bool BotIsLookingAt(AFortPlayerPawnAthena* Me, const FVector& MyLoc, const FVector& ThemLoc)
     {
         const double dx = ThemLoc.X - MyLoc.X;
@@ -2672,7 +2494,6 @@ namespace BotAI
         if (FacingLength < 0.001)
             return true;
 
-        // cos of the angle between where it is looking and where the other one is
         const double Dot = ((Facing.X / FacingLength) * (dx / Flat)) + ((Facing.Y / FacingLength) * (dy / Flat));
 
         double HalfAngle = (double)FConfiguration::BotFieldOfView * 0.5;
@@ -2683,18 +2504,13 @@ namespace BotAI
         return Dot >= cos(HalfAngle * 3.14159265358979323846 / 180.0);
     }
 
-    // Both defined further down, with the engine's line trace.
     static bool BotTraceAvailable();
     static bool BotStraightLineSees(AFortPlayerPawnAthena* Me, AActor* Them, std::string* WhatIsInTheWay);
 
-    // [EYES]: what the straight line from a bot's eyes said (player-controller bots).
     static int GSightByLineClear = 0;
     static int GSightByLineBlocked = 0;
     static std::string GSightFirstBlocker;
 
-    // And is there actually a clear line to them. Asked of the game itself, so walls and floors
-    // count. Builds that do not have the function fall back to the cone alone rather than going
-    // blind in the other direction and never seeing anybody.
     static bool BotHasLineOfSight(AAIController* AIController, AActor* Them)
     {
         static int Available = -1;
@@ -2708,11 +2524,6 @@ namespace BotAI
                     Available ? "cannot" : "can still");
         }
 
-        // A player-controller bot (every bot on 1.8.2) gets a straight line from its own eyes, checked here. The game's
-        // own LineOfSightTo said "cannot see" for these bots every single time -- 265 engagements in one log, 2316 in the
-        // next, and not one burst -- even when asked to look from the bot's own eyes, with a clear line to you (the
-        // [EYES] samples: "a straight line to them hits PlayerPawn_Athena_C_100", which was your pawn). So: whatever the
-        // line from its eyes hits first has to be them, or something they are holding, or nothing at all.
         if (AIController && Them && IsPlayerControllerBot((AActor*)AIController))
         {
             auto MyPawn = (AFortPlayerPawnAthena*)((AFortPlayerControllerAthena*)AIController)->Pawn;
@@ -2734,7 +2545,6 @@ namespace BotAI
                         GSightFirstBlocker = Blocker;
                 }
 
-                // The first few times, for the log: what the game's own check says about the same pair.
                 static int Compared = 0;
 
                 if (Available == 1 && Compared < 6)
@@ -2761,12 +2571,8 @@ namespace BotAI
         if (Available != 1 || !AIController || !Them)
             return true;
 
-        FVector ViewPoint{};   // zero: the game uses the controller's own eyes
+        FVector ViewPoint{};   
 
-        // A player controller's eyes are its camera, and nothing ever moves a bot's camera (no game client sends it):
-        // the check looked from wherever that camera was left and found something in the way every time -- in the
-        // 1.8.2 log, 265 engagements and not one burst fired, with a clear line from the bot to you. So the check looks
-        // from the bot's own eyes.
         if (IsPlayerControllerBot((AActor*)AIController))
         {
             auto MyPawn = (AFortPlayerPawnAthena*)((AFortPlayerControllerAthena*)AIController)->Pawn;
@@ -2781,8 +2587,6 @@ namespace BotAI
         return AIController->LineOfSightTo(Them, ViewPoint, false);
     }
 
-    // Once a bot has seen somebody it keeps looking for a moment after they break the line, rather
-    // than forgetting them the instant they step behind a tree.
     static std::map<void*, std::pair<void*, int>> BotLastSaw;
 
     static bool BotCanSee(AAIController* AIController, AFortPlayerPawnAthena* Me, const FVector& MyLoc,
@@ -2802,12 +2606,9 @@ namespace BotAI
             return true;
         }
 
-        // Strict sight (used for real players): they are "visible" only with current line of sight.
-        // No memory grace -- the instant the bot cannot see them, it is not allowed to keep firing.
         if (bStrict)
             return false;
 
-        // Lost sight of them just now? Keep hunting for a couple of seconds.
         auto Remembered = BotLastSaw.find((void*)Me);
 
         if (Remembered != BotLastSaw.end() && Remembered->second.first == (void*)Them)
@@ -2826,8 +2627,6 @@ namespace BotAI
         return false;
     }
 
-    // A bot counts as landed only after the bus drop AND the glider is gone.
-    // Never true on spawn island, on the bus, or while still skydiving/gliding.
     static bool BotHasLanded(void* Pawn)
     {
         if (!Pawn)
@@ -2839,13 +2638,9 @@ namespace BotAI
         if (GlidingBots.find(Pawn) != GlidingBots.end())
             return false;
 
-        // Extra safety: if the pawn is still marked as skydiving/from-bus, not landed yet.
-        // (MovedToIsland is set at drop time; glider clear happens a bit later.)
         return true;
     }
 
-    // Hard gate for ALL combat: bus must have left, game must no longer protect players,
-    // and we must be past the aircraft phase. Spawn-island fighting is impossible under this.
     static bool BotCombatIsOpen()
     {
         if (!bBusDeparted)
@@ -2859,14 +2654,12 @@ namespace BotAI
         if (PlayersAreProtected(GS))
             return false;
 
-        // GamePhase_Aircraft = 2, SafeZones = 3. Do not allow combat during aircraft/bus phase.
         if (GS->HasGamePhase() && GS->GamePhase < GamePhase_SafeZones)
             return false;
 
         return true;
     }
 
-    // Magnesium-style spawn: SpawnActor pawn + Athena_PlayerController (works on 1.8.2; no Phoebe)
     int SpawnBots(const FVector& Origin, int Count, float ScatterRadius, const std::wstring& SpawnerDataAssetPath)
     {
         (void)SpawnerDataAssetPath;
@@ -2982,19 +2775,15 @@ namespace BotAI
             if (PlayerState->HasbIsABot())
                 PlayerState->bIsABot = true;
 
-            // Loaded and ready, as far as the game can tell -- or it never lets the bot off the bus (see above).
             MarkBotReadyLikeAPlayer(PC, PlayerState, true);
 
-            // Keep bots killable/alive so HUD and phase logic count them
             Pawn->SetMaxHealth(100.f);
             Pawn->SetHealth(100.f);
-            // SetMaxShield not present on all builds (e.g. 1.8.2)
+            
             Pawn->SetShield(0.f);
             if (Pawn->HasbAlwaysRelevant())
                 Pawn->bAlwaysRelevant = true;
 
-            // Its glider in its cosmetic loadout from the start (round 5), so it goes out with the pawn's first replication: the
-            // glider that opens over the island is then one everybody's game can draw (SendBotToItsLandingSpot).
             PutGliderInBotLoadout(Pawn, PickBotGlider());
 
             if (!PC->WorldInventory)
@@ -3010,7 +2799,6 @@ namespace BotAI
             if (PC->HasbHasInitializedWorldInventory())
                 PC->bHasInitializedWorldInventory = true;
 
-            // Starting items from GameMode if present
             if (GameMode->HasStartingItems() && PC->WorldInventory)
             {
                 for (int si = 0; si < GameMode->StartingItems.Num(); si++)
@@ -3021,13 +2809,8 @@ namespace BotAI
                 }
             }
 
-            // Its loot: a few chests' worth from the game's own loot tables (GiveBotLootpoolKit, round 5) -- every bot used to
-            // get the same fixed kit below, which is why they all had gold SCARs. The fixed kit is only handed out now when
-            // the loot tables give no gun at all, and its guns come with their spare rounds.
             const bool bLootpoolKit = PC->WorldInventory && GiveBotLootpoolKit(PC, PlayerState) > 0;
 
-            // Fixed 1.8.2 loadout via WorldInventory (same path as Magnesium giveitem)
-            // Full paths + short-name fallback (1.8.2 FindObject needs package path)
             static const wchar_t* KitPaths[] = {
                 L"/Game/Athena/Items/Weapons/WID_Assault_AutoHigh_Athena_SR_Ore_T03.WID_Assault_AutoHigh_Athena_SR_Ore_T03",
                 L"/Game/Athena/Items/Weapons/WID_Shotgun_Standard_Athena_C_Ore_T03.WID_Shotgun_Standard_Athena_C_Ore_T03",
@@ -3074,7 +2857,6 @@ namespace BotAI
                                     clip = Stats->ClipSize;
                             PC->WorldInventory->GiveItem(Def, 1, clip);
 
-                            // ...and the rounds to reload it with (the game's own reload needs some to be there).
                             GiveBotSpareRounds(PC->WorldInventory, Def);
                         }
                         else
@@ -3093,7 +2875,6 @@ namespace BotAI
             if (GameMode->HasAlivePlayers())
                 GameMode->AlivePlayers.Add(PC);
 
-            // best-effort net relevance (props may be missing on some builds)
             if (Pawn->HasbAlwaysRelevant())
                 Pawn->bAlwaysRelevant = true;
 
@@ -3105,20 +2886,6 @@ namespace BotAI
         return spawned;
     }
 
-    // ---- getting the bots off the bus ------------------------------------------------------------------------
-    //
-    // On 1.8.2 a bot is a real Athena_PlayerController (spawned the Magnesium way), so when the bus leaves the game
-    // treats it like any other passenger: its pawn is taken away and it is put on the bus. In the last two logs the
-    // game's own ServerAttemptAircraftJump turned every bot down for the whole drop -- 3000 tries, with every
-    // "finished loading" flag set and the doors open -- and then, at the end of its drop zone, the bus threw all 99
-    // out onto one spot: 5 got a pawn, the other 94 a broken one with no health that would not take any, and they
-    // were all counted dead in one tick (each "kill" credited to you).
-    //
-    // So now it is done the way Magnesium gets its bots off the bus on these old builds: once the doors open, every
-    // bot gets its pawn made by hand at its own landing spot (no two on one spot), and is marked off the bus on its
-    // controller (MarkBotOffTheBus), so the bus has nobody left to throw out. The game's own jump is still tried on
-    // the first 3 bots, in case this build lets them. And if the bus touches a bot anyway, KeepBotsOnTheirOwnPawns
-    // puts it back on its own pawn -- or gives it a new one -- before anything counts who is alive.
     static bool GameJumpRaw(AFortPlayerControllerAthena* Controller)
     {
         FRotator Facing{};
@@ -3143,12 +2910,10 @@ namespace BotAI
     static int GGameJumps = 0;
     static int GHandMadeBotPawns = 0;
     static int GThrownOutByBus = 0;
-    static int GMarkedOffTheBus = 0;       // marked off the bus on the controller, and the game agreed
-    static int GNotMarkedOffTheBus = 0;    // could not be (the reason is in the log)
-    static int GBrokenPawnsReplaced = 0;   // a pawn the game made with no health, that would not take any: replaced
+    static int GMarkedOffTheBus = 0;       
+    static int GNotMarkedOffTheBus = 0;    
+    static int GBrokenPawnsReplaced = 0;   
 
-    // When the bus reaches the end of its drop zone (the game throws everyone still on board out there), or -1 if
-    // the bus cannot be read.
     static float BusDropEndTime(AFortGameStateAthena* GameState)
     {
         if (!GameState)
@@ -3186,12 +2951,7 @@ namespace BotAI
         return Aircraft->DropStartTime;
     }
 
-    // A pawn the game makes for a bot (its own jump, or the bus throwing it out at the end of the drop zone) comes
-    // with no health filled in. The real player is topped up on every new pawn (the [PROTECT] line); a bot never
-    // was, so every bot the bus threw out read as dead the moment it appeared -- in the 1.8.2 log 94 bots were
-    // "eliminated" in a single tick ("lowest health seen = 0.0"), and every one of those kills went to you. A bot
-    // pawn first seen at 0 health that is not dying gets the 100 a bot spawns with.
-    static std::map<void*, void*> BotPawnHealthChecked;   // bot controller -> the pawn already checked
+    static std::map<void*, void*> BotPawnHealthChecked;   
     static int GFreshPawnsHealed = 0;
 
     static void GiveFreshBotPawnHealth(AFortPlayerControllerAthena* Controller, AFortPlayerPawnAthena* Pawn, const char* Where)
@@ -3225,7 +2985,6 @@ namespace BotAI
         }
     }
 
-    // Every bot pawn, every tick, before anything counts the living: a new pawn at 0 health gets its 100.
     static void GiveFreshBotPawnsHealth(AFortGameStateAthena* GameState)
     {
         if (!GameState || !GameState->HasPlayerArray())
@@ -3248,22 +3007,18 @@ namespace BotAI
             if (Pawn)
                 GiveFreshBotPawnHealth(Controller, Pawn, "a pawn the game made");
             else
-                BotPawnHealthChecked.erase((void*)Controller);   // on the bus: its next pawn is checked even at the same address
+                BotPawnHealthChecked.erase((void*)Controller);   
         }
     }
 
-    // ---- the pawn each bot is meant to be on -------------------------------------------------------------------
-    //
-    // Set when a bot leaves the bus with a pawn that has its health. Kept as a weak pointer, so "is it still there"
-    // can be asked without touching freed memory.
     struct FGoodBotPawn
     {
         AFortPlayerPawnAthena* Pawn = nullptr;
         FWeakObjectPtr Weak{};
-        float LastHealth = 0.f;   // its health the last time it was looked at
+        float LastHealth = 0.f;   
     };
 
-    static std::map<void*, FGoodBotPawn> GoodBotPawns;   // bot controller -> its own pawn
+    static std::map<void*, FGoodBotPawn> GoodBotPawns;   
 
     static void RememberGoodBotPawn(AFortPlayerControllerAthena* Controller, AFortPlayerPawnAthena* Pawn)
     {
@@ -3276,7 +3031,6 @@ namespace BotAI
         Good.LastHealth = Pawn->GetHealth();
     }
 
-    // The object is still there and not on its way out (destroyed, waiting for the garbage collector).
     static bool BotPawnStillExists(const FGoodBotPawn& Good)
     {
         if (!Good.Pawn || Good.Weak.Get() != (const UObject*)Good.Pawn)
@@ -3284,7 +3038,7 @@ namespace BotAI
 
         if (VersionInfo.EngineVersion < 5.0)
         {
-            // UE4: EInternalObjectFlags::PendingKill (1 << 29) and Unreachable (1 << 28)
+            
             auto Item = TUObjectArray::GetItemByIndex(Good.Weak.ObjectIndex);
 
             if (!Item || (Item->Flags & (0x20000000 | 0x10000000)))
@@ -3294,7 +3048,6 @@ namespace BotAI
         return true;
     }
 
-    // ...and alive.
     static bool BotPawnIsUsable(const FGoodBotPawn& Good)
     {
         if (!BotPawnStillExists(Good))
@@ -3306,12 +3059,10 @@ namespace BotAI
         return Good.Pawn->GetHealth() > 0.f;
     }
 
-    // ---- where every bot comes down ------------------------------------------------------------------------------
     static std::vector<FVector> LandingPlan;
     static size_t LandingPlanCursor = 0;
     static bool bPlanBuilt = false;
 
-    // Built once, the first time a bot leaves the bus.
     static void BuildLandingPlan(UWorld* World, AFortGameStateAthena* GameState)
     {
         if (bPlanBuilt || !World || !GameState)
@@ -3417,8 +3168,6 @@ namespace BotAI
                 int total = FConfiguration::AutoFillTargetPlayerCount;
                 if (total < 1) total = 100;
 
-                
-                
                 int cols = (int)ceil(sqrt((double)total));
                 if (cols < 1) cols = 1;
                 int rows = (total + cols - 1) / cols;
@@ -3449,8 +3198,6 @@ namespace BotAI
                        Plan.size(), cols, rows, (float)usableX, (float)usableY);
             }
 
-            // A hot drop: take a slice of the plan back off the grid and point it at one place, so
-            // there is somewhere on the map with a crowd instead of one bot every few hundred metres.
             {
                 const char* Wanted = FConfiguration::HotDropPoi;
                 int HowMany = FConfiguration::HotDropBots;
@@ -3463,8 +3210,6 @@ namespace BotAI
                     FVector Middle{};
                     bool bFound = false;
 
-                    // The POI volumes the level places are the better answer when the tag matches,
-                    // because that is the game's own idea of where the place is.
                     const std::string WantedTag = Normalize(Wanted);
 
                     for (auto* Poi : RealPois)
@@ -3474,10 +3219,6 @@ namespace BotAI
                             if (tag.find(WantedTag) == std::string::npos)
                                 continue;
 
-                            // On this build every POI volume reports itself at the map origin, so a
-                            // tag match on its own is not enough -- taking it at its word would drop
-                            // the whole crowd at 0,0,0 in the middle of the sea. Only believe a volume
-                            // that is somewhere real; otherwise fall through to the recording.
                             const double Away = sqrt((double)Poi->Loc.X * (double)Poi->Loc.X +
                                                      (double)Poi->Loc.Y * (double)Poi->Loc.Y);
 
@@ -3517,7 +3258,6 @@ namespace BotAI
                         int Got = PlaceDump::GetPlacesNear(Middle, FConfiguration::HotDropRadius,
                                                            HowMany, Spots.data());
 
-                        // No recorded places around there, so scatter them around the middle instead.
                         if (Got <= 0)
                         {
                             for (int i = 0; i < HowMany; i++)
@@ -3553,7 +3293,6 @@ namespace BotAI
         }
     }
 
-    // The next landing spot, high over the island (every bot has its own).
     static FVector NextLandingSpot(UWorld* World, AFortGameStateAthena* GameState)
     {
         BuildLandingPlan(World, GameState);
@@ -3570,9 +3309,7 @@ namespace BotAI
         return Dest;
     }
 
-    // Each bot's own landing spot: handed out the first time it is asked for, the same one every time after that -- a
-    // retry, or a new pawn later on, goes to the bot's own spot, so no two bots ever share one.
-    static std::map<void*, FVector> BotLandingSpot;   // bot controller -> its spot
+    static std::map<void*, FVector> BotLandingSpot;   
 
     static FVector LandingSpotFor(UWorld* World, AFortGameStateAthena* GameState, void* Controller)
     {
@@ -3589,9 +3326,6 @@ namespace BotAI
         return Spot;
     }
 
-    // A pawn made by hand for a bot: possessed, with the health a bot spawns with. Made right at its landing spot,
-    // which is its own -- the bus's own exit made all 99 pawns on one spot, and 94 of them failed ("SpawnActor
-    // failed because of collision").
     static AFortPlayerPawnAthena* MakeBotPawnByHand(AFortPlayerControllerAthena* Controller, AFortPlayerStateAthena* PlayerState,
                                                     const FVector& Where)
     {
@@ -3602,7 +3336,7 @@ namespace BotAI
 
         FTransform Tr{};
         FVector One(1.f, 1.f, 1.f);
-        FVector SpawnAt(Where.X, Where.Y, Where.Z);   // a named vector: the SDK's Translation setter takes FVector&, not a temporary
+        FVector SpawnAt(Where.X, Where.Y, Where.Z);   
         Tr.Scale3D = One;
         Tr.Translation = SpawnAt;
 
@@ -3623,7 +3357,6 @@ namespace BotAI
         return Pawn;
     }
 
-    // From wherever its pawn is to its spot high over the island, skydiving, with its glider for the way down.
     static void SendBotToItsLandingSpot(UWorld* World, AFortPlayerPawnAthena* Pawn, FVector Dest)
     {
         if (!World || !Pawn)
@@ -3637,13 +3370,8 @@ namespace BotAI
         if (!bTeleported)
             Pawn->K2_SetActorLocation(Dest, false, (void*)nullptr, true);
 
-        // The game's own skydive from the bus -- the same call as in the build where gliding worked.
-        // (bIsSkydiving used to be set by hand first and its OnRep called without the argument it
-        // takes; that crashed right here for every bot, so this line never ran and nobody really
-        // skydived or glided.)
         Pawn->BeginSkydiving(true);
 
-        // Only if the game did not set them itself: so clients see the dive.
         if (Pawn->HasbIsSkydivingFromBus() && !Pawn->bIsSkydivingFromBus)
             Pawn->bIsSkydivingFromBus = true;
         if (Pawn->HasbIsSkydiving() && !Pawn->bIsSkydiving)
@@ -3653,8 +3381,6 @@ namespace BotAI
             Pawn->OnRep_IsSkydiving(bWasSkydiving);
         }
 
-        // Its glider for the way down (round 5): the one SpawnBots put in its cosmetic loadout -- what everybody's game draws
-        // when it opens -- or, on a pawn that has none (one made by hand off the bus), a new pick, put in its loadout now.
         const UObject* Glider = GliderInBotLoadout(Pawn);
         const char* GliderLoadout = "in its loadout since it spawned";
 
@@ -3689,7 +3415,6 @@ namespace BotAI
 
         PendingParachuteOpen[(void*)Pawn] = DropTime + 3.f;
 
-        // Watched from here until its feet are on the ground, so the glider comes back off.
         GlidingBots[(void*)Pawn] = (float)After.Z;
         GlidingSettledFor[(void*)Pawn] = 0;
 
@@ -3701,7 +3426,6 @@ namespace BotAI
         Glide.LastDescentTime = DropTime;
     }
 
-    // A pawn, for the log: "a pawn with 0 health at Z=81312", or "no pawn at all".
     static std::string DescribeBotPawn(AFortPlayerPawnAthena* Pawn)
     {
         if (!Pawn)
@@ -3713,21 +3437,11 @@ namespace BotAI
         return std::string(Text);
     }
 
-    // ---- if the bus touches a bot anyway --------------------------------------------------------------------------
-    //
-    // Should the bus still throw a bot out at the end of its drop zone (a build where it cannot be marked off the
-    // bus), the bot gets moved onto a new pawn -- in the logs, for most bots, a broken one with no health. Every tick
-    // around the bus, before anything counts who is alive:
-    //   - its own pawn still fine -> it is put back on it, and the other pawn is removed;
-    //   - its own pawn taken away while it was alive -> the pawn the game gave it is kept if it has (or takes) health,
-    //     otherwise it gets a new one made by hand, at a landing spot of its own.
-    // A pawn that is still there but down is a bot that died: that is left alone. And after the bus is long gone
-    // (20 s after the end of its drop zone) none of this runs at all.
-    static int GPawnSwapsUndone = 0;        // the game moved a bot off its own pawn: put back on it
-    static int GPawnSwapsNotUndone = 0;     // ...and it could NOT be put back
+    static int GPawnSwapsUndone = 0;        
+    static int GPawnSwapsNotUndone = 0;     
     static int GGamePawnsAdopted = 0;
     static int GLostPawnsRemade = 0;
-    static int GBrokenPawnsSwappedIn = 0;   // the game left a bot on a broken pawn: replaced here
+    static int GBrokenPawnsSwappedIn = 0;   
     static int GReplacementsFailed = 0;
 
     static void KeepBotsOnTheirOwnPawns(AFortGameStateAthena* GameState)
@@ -3747,7 +3461,6 @@ namespace BotAI
         if (FirstLook < 0.f)
             FirstLook = Now;
 
-        // The end of the drop zone, kept once it has been read (the bus itself goes away later).
         static float DropEnd = -1.f;
         if (DropEnd <= 0.f)
             DropEnd = BusDropEndTime(GameState);
@@ -3756,7 +3469,7 @@ namespace BotAI
 
         if (Now > Until)
         {
-            // Once, and never again: from here on a bot whose pawn is gone has died, and that is RemoveDeadBots' business.
+            
             bWindowClosed = true;
 
             {
@@ -3784,9 +3497,6 @@ namespace BotAI
             return;
         }
 
-        // Where everybody is just after the bus reaches the end of its drop zone (that is when it throws out whoever
-        // it still has on board): once a second after, once five seconds after. (Anything this has put right by then is
-        // in the counts on the same line.)
         static int SnapshotsTaken = 0;
 
         if (DropEnd > 0.f && SnapshotsTaken < 2 && Now >= DropEnd + (SnapshotsTaken == 0 ? 1.f : 5.f))
@@ -3843,7 +3553,7 @@ namespace BotAI
 
             auto GoodIt = GoodBotPawns.find((void*)Controller);
             if (GoodIt == GoodBotPawns.end())
-                continue;   // not off the bus yet -- MoveSomeBotsToIsland has it
+                continue;   
 
             FGoodBotPawn& Good = GoodIt->second;
             auto Current = (AFortPlayerPawnAthena*)Controller->Pawn;
@@ -3856,7 +3566,6 @@ namespace BotAI
                 continue;
             }
 
-            // 1) Its own pawn is still fine: back onto it, and the other one goes.
             if (BotPawnIsUsable(Good))
             {
                 const std::string Other = DescribeBotPawn(Current);
@@ -3880,7 +3589,6 @@ namespace BotAI
                     bRemoved = true;
                 }
 
-                // and if the game put it back on the bus while it was at it, off again
                 const char* Why = "it was not on board";
                 if (bBack && Controller->IsInAircraft())
                     MarkBotOffTheBus(Controller, &Why);
@@ -3910,19 +3618,15 @@ namespace BotAI
                 continue;
             }
 
-            // 2) Its own pawn is still there, but down: it died. Nothing to put right here -- and remembered as down, so
-            //    it is never brought back once that pawn is cleared away.
             if (BotPawnStillExists(Good))
             {
                 Good.LastHealth = 0.f;
                 continue;
             }
 
-            // ...and if it was not alive at the last look either, it is not ours to bring back.
             if (!(Good.LastHealth > 0.f))
                 continue;
 
-            // ...nor if the game no longer has it in the match.
             {
                 auto Mode = (AFortGameMode*)World->AuthorityGameMode;
                 bool bStillIn = false;
@@ -3942,7 +3646,6 @@ namespace BotAI
                 }
             }
 
-            // 3) Its own pawn was taken away while it was alive: the game did that, not a fight.
             const std::string Was = DescribeBotPawn(Current);
 
             if (Current)
@@ -3973,13 +3676,12 @@ namespace BotAI
                 }
             }
 
-            // A broken pawn (no health, and it will not take any) or none at all: a new one by hand, the broken one goes.
             const FVector Spot = LandingSpotFor(World, GameState, (void*)Controller);
             auto Fresh = MakeBotPawnByHand(Controller, PlayerState, Spot);
 
             if (!Fresh)
             {
-                // In the match still, for a moment, while this is tried again next tick.
+                
                 BotBeingFixedUntil[(void*)Controller] = Now + 3.f;
                 GReplacementsFailed++;
 
@@ -4040,8 +3742,6 @@ namespace BotAI
         const float DropStart = BusDropStartTime(GameState);
         const float DropEnd = BusDropEndTime(GameState);
 
-        // Nobody gets off before the doors open (the start of the drop zone) -- the same as a player. If the bus
-        // cannot be read, they go now (12 s after the bus left, as before).
         if (DropStart > 0.f && Now < DropStart)
         {
             static bool bSaidSo = false;
@@ -4075,17 +3775,14 @@ namespace BotAI
             if (!Controller)
                 continue;
 
-            // An eliminated bot stays eliminated -- it does not get a new pawn off the bus.
             if (EliminatedBots.find((void*)Controller) != EliminatedBots.end())
                 continue;
 
             auto Pawn = (AFortPlayerPawnAthena*)Controller->Pawn;
 
-            // Already sent to its landing spot.
             if (Pawn && MovedToIsland.find((void*)Pawn) != MovedToIsland.end())
                 continue;
 
-            // Already on a pawn it was not given here: it kept its pawn from the island, or the game let it out itself.
             const bool bThrownOut = Pawn != nullptr;
             bool bJumpedItself = false;
             bool bHandMade = false;
@@ -4094,12 +3791,10 @@ namespace BotAI
             {
                 const bool bWasAboard = Controller->IsInAircraft();
 
-                // The "finished loading" flags once more before it leaves, in case boarding the bus reset any.
                 static std::set<void*> ReadiedForTheJump;
                 if (ReadiedForTheJump.insert((void*)Controller).second)
                     MarkBotReadyLikeAPlayer(Controller, PlayerState, false);
 
-                // The game's own jump: on the first 3 bots, and on every bot for as long as it works.
                 if (bWasAboard && !GGameJumpBroken && (GGameJumps > 0 || GGameJumpTries < 3))
                 {
                     GGameJumpTries++;
@@ -4174,8 +3869,6 @@ namespace BotAI
                 }
             }
 
-            // A pawn the game made gets health before anything can count it as dead -- and one that will not take any
-            // (the bus's broken pawns) is replaced by one made by hand.
             if (!bHandMade)
             {
                 GiveFreshBotPawnHealth(Controller, Pawn, bJumpedItself ? "off the bus with the game's own jump" : "a pawn it already had");
@@ -4187,7 +3880,7 @@ namespace BotAI
 
                     if (!Fresh)
                     {
-                        // Not sent anywhere on a pawn with no health: still in the match while this is tried again next tick.
+                        
                         BotBeingFixedUntil[(void*)Controller] = Now + 3.f;
 
                         static int FixFailures = 0;
@@ -4217,8 +3910,6 @@ namespace BotAI
                 }
             }
 
-            // Off the bus as far as the game is concerned too -- so the bus has nobody to throw out at the end of its
-            // drop zone.
             const char* Why = "it was not on board";
             bool bOffTheBus = !Controller->IsInAircraft();
 
@@ -4383,7 +4074,6 @@ namespace BotAI
             if (OwnerActor)
                 Pw = (AFortPlayerPawnAthena*)((AFortPlayerControllerAthena*)OwnerActor)->Pawn;
 
-            // same rule as the win check: no pawn but still in the game's AlivePlayers = on the bus, alive
             bool bPawnless = false;
             bool bAlive = PlayerIsStillIn(GameMode, PS, &bPawnless);
 
@@ -4442,8 +4132,6 @@ namespace BotAI
         if (!GameState->HasPlayerArray() || !GameState->HasPlayersLeft())
             return;
 
-        // Players on the bus have no pawn but are very much alive (see PlayerIsStillIn) -- counting pawns only is
-        // what knocked the shown count from 100 down to 1 the moment the bus left.
         auto GameMode = CurrentGameMode();
 
         int trueAlive = 0;
@@ -4568,31 +4256,29 @@ namespace BotAI
         fflush(stdout);
     }
 
-    // Custom zone timings requested by host (forming = WaitTime, closing = ShrinkTime), seconds.
-    // Index 0 = phase 1, ...  Phase 7+ only had closing times listed so form defaults to 0.
     static const float kZoneWait[] = {
-        170.f, // P1 form  2:50
-        120.f, // P2 form  2:00
-         90.f, // P3 form  1:30
-         80.f, // P4 form  1:20
-         50.f, // P5 form  0:50
-         30.f, // P6 form  0:30
-          0.f, // P7 form  (none listed)
-          0.f, // P8 form
-          0.f, // P9 form
-         10.f, // Final
+        170.f, 
+        120.f, 
+         90.f, 
+         80.f, 
+         50.f, 
+         30.f, 
+          0.f, 
+          0.f, 
+          0.f, 
+         10.f, 
     };
     static const float kZoneShrink[] = {
-        210.f, // P1 close 3:30
-        120.f, // P2 close 2:00
-         90.f, // P3 close 1:30
-         70.f, // P4 close 1:10
-         60.f, // P5 close 1:00
-         60.f, // P6 close 1:00
-         55.f, // P7 close 0:55
-         50.f, // P8 close 0:50
-         75.f, // P9 close 1:15
-         10.f, // Final
+        210.f, 
+        120.f, 
+         90.f, 
+         70.f, 
+         60.f, 
+         60.f, 
+         55.f, 
+         50.f, 
+         75.f, 
+         10.f, 
     };
     static const int kZoneCount = (int)(sizeof(kZoneWait) / sizeof(kZoneWait[0]));
 
@@ -4613,8 +4299,7 @@ namespace BotAI
         static bool bLogged = false;
         for (int i = 0; i < N; i++)
         {
-            // FFortSafeZonePhaseInfo layout uses DEFINE_STRUCT_PROP -- access WaitTime/ShrinkTime.
-            // Index clamp into our table.
+
             int idx = i;
             if (idx >= kZoneCount)
                 idx = kZoneCount - 1;
@@ -4655,7 +4340,6 @@ namespace BotAI
 
         auto& Definition = MapInfo->SafeZoneDefinition;
 
-        // Also push phase-0 defaults onto the definition scalable floats as a fallback.
         if (FFortSafeZoneDefinition::HasWaitTime())
         {
             auto& WaitTime = Definition.WaitTime;
@@ -4922,8 +4606,6 @@ namespace BotAI
         fflush(stdout);
     }
 
-    // Season 1's own storm timing (what 1.8.2 itself gave phases 1 to 6 in the last log: 200/180, 150/90, 120/90, 120/60,
-    // 90/40, 90/30), and short closing circles after that. Only used for a real circle that arrives with no time on it.
     static void SeasonOneStormTiming(int Phase, float& OutWait, float& OutShrink)
     {
         static const float Wait[] = { 200.f, 200.f, 150.f, 120.f, 120.f, 90.f, 90.f, 60.f, 45.f, 30.f };
@@ -4939,9 +4621,6 @@ namespace BotAI
         OutShrink = Shrink[Phase];
     }
 
-    // Every change to what the clients are told about the storm, the moment it happens -- the game state's storm start
-    // time and phase, the indicator, its shrink times and its radii -- so the log shows exactly what the storm timer on
-    // the HUD had to go on (the 5-second [Storm] lines above only sample it).
     static void LogStormChanges(AFortGameMode* GameMode, AFortGameStateAthena* GameState)
     {
         if (!GameMode || !GameState)
@@ -5028,10 +4707,9 @@ namespace BotAI
     }
 
     static std::map<void*, std::pair<void*, int>> BotTopDamager;
-    // Most recent damager (by time we observed them), not highest-damage. Used for elim credit.
+    
     static std::map<void*, std::pair<void*, int>> BotLastDamager;
 
-    // Round 5: victim controller -> (the bot that last hit it with the bot code's own damage, GStormTick) -- BotHitTarget.
     static std::map<void*, std::pair<void*, int>> BotCodeLastHit;
 
     static AFortPlayerStateAthena* ResolveDamagerState(AActor* Causer)
@@ -5124,24 +4802,9 @@ namespace BotAI
                 "and the bus forgotten. Damage and eliminations start counting from here.", Healed);
     }
 
-
-
-    // =========================================================================
-    // BUILD GRID (from human freebuild BUILD-LOG + host description)
-    //
-    //   1 tile  = 5 meters = 512 Unreal units (wall width / floor width)
-    //   1 floor = ~3.75m  = 384 Unreal units (human Z steps were always 384)
-    //   Every real piece Loc was a multiple of 128; horizontal steps 256/512.
-    //
-    // Placement is RELATIVE to the bot (not a blind world-origin snap that
-    // floats pieces in the sky). We:
-    //   1) snap the bot's feet to the nearest tile cell
-    //   2) place the wall 1 tile (512) in the facing direction
-    //   3) keep Z on the same floor plane as the bot
-    // =========================================================================
-    static constexpr double kTile   = 512.0;  // 5 meters
-    static constexpr double kFloor  = 384.0;  // one storey
-    static constexpr double kSub    = 128.0;  // finest real alignment
+    static constexpr double kTile   = 512.0;  
+    static constexpr double kFloor  = 384.0;  
+    static constexpr double kSub    = 128.0;  
 
     static double SnapTile(double v)
     {
@@ -5150,16 +4813,10 @@ namespace BotAI
 
     static double SnapFloorZ(double v)
     {
-        // Floor planes sit on multiples of 384 (also multiple of 128).
+        
         return round(v / kFloor) * kFloor;
     }
 
-    // Where a piece's pivot goes depends on which way the piece faces -- read straight off the player's own
-    // builds in the BUILD-LOG (every wall, floor, roof and ramp, all 30+ of them, follow it):
-    //   facing north/south (yaw 0 or 180):  X on a 512 line,  Y on the half tile (...256)
-    //   facing east/west   (yaw 90 or -90): X on the half tile (...256),  Y on a 512 line
-    // Bots used to put every piece on the north/south spot, so anything facing east or west came out half a
-    // tile off in both directions -- the "built off the grid" pieces.
     static bool BuildFacesEastWest(double Yaw)
     {
         const long Quarter = lround(Yaw / 90.0);
@@ -5171,8 +4828,7 @@ namespace BotAI
         if (BuildFacesEastWest(Yaw))
             return FVector{ SnapTile(V.X - 256.0) + 256.0, SnapTile(V.Y), SnapFloorZ(V.Z) };
 
-        // XY on the 5m tile grid, Z on the storey grid.
-        return FVector{ SnapTile(V.X), SnapTile(V.Y - 256.0) + 256.0, SnapFloorZ(V.Z) };  // grid moved 256 east (+Y); north (+X) moved 256 + 256 = 512 = one whole tile, which is the original lines
+        return FVector{ SnapTile(V.X), SnapTile(V.Y - 256.0) + 256.0, SnapFloorZ(V.Z) };  
     }
 
     static FRotator SnapBuildRotation(const FRotator& R)
@@ -5222,9 +4878,6 @@ namespace BotAI
         return Building;
     }
 
-    // On aggro: ONE wall in front of the bot, towards whoever it is fighting, on the same grid the player's
-    // own walls snap to. (It used to also throw a second wall off to one side -- facing sideways, so it did
-    // nothing for it -- and sometimes a ramp in the same spot as the wall. Both are gone.)
     static void TryBotReactiveBuild(AFortGameStateAthena* GameState)
     {
         if (!GameState || !GameState->HasPlayerArray())
@@ -5298,8 +4951,6 @@ namespace BotAI
             if (Loc.Z > 8000.0)
                 continue;
 
-            // "In front" = towards the one it is locked onto; if it is not fighting anybody yet, towards whoever
-            // just shot it; failing both, the way it is facing.
             AFortPlayerPawnAthena* Threat = nullptr;
             const char* Toward = "the way it was facing";
 
@@ -5348,7 +4999,6 @@ namespace BotAI
                 }
             }
 
-            // Cardinal forward from snapped yaw: N/E/S/W only, like the player's own walls.
             FRotator GridFacing = SnapBuildRotation(Facing);
 
             const double YawRad = GridFacing.Yaw * (3.14159265358979323846 / 180.0);
@@ -5360,15 +5010,12 @@ namespace BotAI
             if (!(Ahead > 0.0))
                 Ahead = kTile + kTile;
 
-            // The wall stands on the grid line nearest to Ahead in front of the bot, across the tile the bot is
-            // in. Facing north/south it lands exactly where it always did (the spot you approved); facing
-            // east/west it now lands on the east/west spot instead of half a tile off.
             FVector Wall1{};
 
             if (!bEastWest)
             {
-                Wall1.X = SnapTile(Loc.X + (Fx > 0.0 ? Ahead : -Ahead));  // north (+X) moved 256 + 256 = 512 = one whole tile, which is the original lines
-                Wall1.Y = SnapTile(Loc.Y - 256.0) + 256.0;                // grid moved 256 east (+Y)
+                Wall1.X = SnapTile(Loc.X + (Fx > 0.0 ? Ahead : -Ahead));  
+                Wall1.Y = SnapTile(Loc.Y - 256.0) + 256.0;                
             }
             else
             {
@@ -5376,9 +5023,6 @@ namespace BotAI
                 Wall1.Y = SnapTile(Loc.Y + (Fy > 0.0 ? Ahead : -Ahead));
             }
 
-            // The storey its body is in (the capsule's middle), so the wall covers it. Rounding its feet to the
-            // nearest storey picked the one above whenever it stood in the top half of a storey, and the wall
-            // then hung in the air over its head.
             const double FloorZ = floor(Loc.Z / kFloor) * kFloor;
             Wall1.Z = FloorZ;
 
@@ -5471,10 +5115,7 @@ namespace BotAI
                     if (CauserState->HasbIsABot() && CauserState->bIsABot)
                     {
                         GCombatBotOnBotHits++;
-                        // Bot-on-bot: still counts as under fire for reactive building (handled below).
 
-                        // Did the shooter hit the one it is locked onto, or somebody else? If bots really fight
-                        // only their own target, nearly every hit lands on it.
                         if (CauserState->HasOwner() && CauserState->Owner)
                         {
                             auto ShooterPawn = (AFortPlayerPawnAthena*)((AFortPlayerControllerAthena*)CauserState->Owner)->Pawn;
@@ -5501,7 +5142,7 @@ namespace BotAI
                     }
                     else
                     {
-                        // Real player shot this bot -- aggro so it returns fire even at long range.
+                        
                         AggroedByHuman[(void*)Controller] = { Causer, GStormTick };
                     }
                 }
@@ -5509,20 +5150,17 @@ namespace BotAI
 
             BotTopDamager[(void*)Controller] = { Causer, CauserDamage };
 
-            // Always record the latest damager (bot OR human) so elim credit goes to last hit.
-            // Also refresh under-fire so reactive builds trigger for bot-on-bot fights, not only humans.
             if (Causer)
             {
                 auto PrevLast = BotLastDamager.find((void*)Controller);
                 const bool bNewDamager = (PrevLast == BotLastDamager.end()) || (PrevLast->second.first != Causer);
 
                 BotLastDamager[(void*)Controller] = { Causer, GStormTick };
-                // Keep TopDamager in sync with last hit so any path that still reads Top still credits last.
+                
                 BotTopDamager[(void*)Controller] = { Causer, CauserDamage };
 
                 BotUnderFireSince[(void*)Controller] = GStormTick;
 
-                // Allow another reactive build when a NEW damager engages them (fresh fight).
                 if (bNewDamager)
                     BotAlreadyBuiltWall.erase((void*)Controller);
             }
@@ -5600,13 +5238,6 @@ namespace BotAI
         return true;
     }
 
-    // Who really damaged this bot, recently enough to count: the last player to hit it -- or, failing that, the one the
-    // game's own damage list says hit it hardest -- as long as that damage landed in the 15 seconds before it died.
-    //
-    // Nothing else counts any more. The last log credited "whoever was shooting at it" (shots that may never have
-    // landed), then "the only player connected", then "the nearest player to the body" -- 56 of the 99 bot deaths went
-    // to you through "the only player connected" alone, bots you had never touched. A bot that dies with no real damage
-    // on record now goes to nobody (SettleElimination).
     static const int KillCreditWindowTicks = 15 * 30;
 
     static AFortPlayerStateAthena* FindBotKiller(AActor* BotController, AFortPlayerStateAthena* VictimState,
@@ -5663,8 +5294,6 @@ namespace BotAI
         return Killer;
     }
 
-    // Bots die down two routes -- the one where we still have the body, and the one where the game
-    // has already taken it away. Both drop loot now, and this stops the same bot dropping twice.
     static std::set<void*> LootAlreadyDropped;
 
     static void DropBotLoot(AFortPlayerControllerAthena* Controller, AFortPlayerPawnAthena* Pawn)
@@ -5679,8 +5308,6 @@ namespace BotAI
 
         auto VictimPS = (AFortPlayerStateAthena*)Controller->PlayerState;
 
-        // The pawn is often already gone by the time we notice the death, so fall back to where we
-        // last saw it.
         FVector dropLoc{};
         bool bHaveDropSpot = false;
 
@@ -5718,7 +5345,6 @@ namespace BotAI
         int fromInventory = 0;
         bool bDroppedMaterials = false;
 
-        // Scatter the pile a little so the pickups do not all land inside each other.
         auto DropOne = [&](const UFortItemDefinition* Definition, int Count, int LoadedAmmo)
         {
             if (!Definition || Count <= 0)
@@ -5750,8 +5376,6 @@ namespace BotAI
                     if (!Entry.HasItemDefinition() || !Entry.ItemDefinition)
                         continue;
 
-                    // Nobody wants to pick up a pickaxe off a body -- nor its building pieces or edit tool (items the game says
-                    // cannot be dropped).
                     if (Entry.ItemDefinition->Cast<UFortWeaponMeleeItemDefinition>() || !Entry.ItemDefinition->CanBeDropped())
                         continue;
 
@@ -5768,8 +5392,6 @@ namespace BotAI
             }
         }
 
-        // The game hands its own bots weapons too, and those never appear in the inventory we made.
-        // Whatever is in their hands when they die is worth dropping.
         if (droppedCount == 0 && Pawn && Pawn->HasCurrentWeapon() && Pawn->CurrentWeapon)
         {
             auto Held = (AFortWeapon*)Pawn->CurrentWeapon;
@@ -5778,8 +5400,6 @@ namespace BotAI
                 DropOne((const UFortItemDefinition*)Held->WeaponData, 1, 30);
         }
 
-        // Nothing on record at all -- drop what we know they were handed, with a magazine in it and
-        // something to heal with, so the body is still worth walking over to.
         if (droppedCount == 0 && VictimPS)
         {
             auto wep = BotWeapons.find((void*)VictimPS);
@@ -5796,8 +5416,7 @@ namespace BotAI
 
                 if (wep->second->Cast<UFortWeaponRangedItemDefinition>())
                 {
-                    // Spare rounds, so what they dropped is actually usable. (The 22.40 list, minus the
-                    // energy cells and arrows that are not on 14.60.)
+
                     static const wchar_t* SpareAmmo[] = {
                         L"AthenaAmmoDataBulletsMedium",
                         L"AthenaAmmoDataBulletsLight",
@@ -5813,7 +5432,6 @@ namespace BotAI
             }
         }
 
-        // Building materials, the way a real elimination leaves them.
         if (droppedCount > 0)
         {
             static const wchar_t* Materials[] = { L"WoodItemData", L"StoneItemData", L"MetalItemData" };
@@ -5839,46 +5457,27 @@ namespace BotAI
                     droppedCount, fromInventory, bDroppedMaterials ? "yes" : "NO");
     }
 
-    // ==== who gets an elimination (round 4) ========================================================================
-    //
-    // In the last log a death could be credited twice: the game's own death report (ClientOnPawnDied, in
-    // FortPlayerControllerAthena.cpp) gave the kill to whoever the game said did it, and then this file's dead-bot sweep
-    // gave it again -- and when the sweep found no damage on record it gave the kill to "the only player connected". That
-    // is how a bot that fell into the hole under the map became your kill, and how the HUD got to 113 kills with 99 bots.
-    // The popup said "Eliminated" with no name because 1.8.2's ClientReportKill takes the victim's NAME, and it was being
-    // handed a pointer.
-    //
-    // Now every death is decided exactly once, here (SettleElimination):
-    //   - the game's own death report decides first -- it knows who really did the damage;
-    //   - a bot death the game never reports (the void under the map, a pawn that just vanished) is decided by the sweep a
-    //     second later, and only from real damage the bot took in its last 15 seconds (FindBotKiller);
-    //   - no killer means nobody is credited, and the death gets one of the four lines in NoKillerMessages.h -- in this
-    //     log, in the server console, in every player's game console and, with the 1.8.2 client DLL, in the killfeed.
-
     static std::string BotObjectName(const UObject* Object);
 
     struct FSettledDeath
     {
         float When = -1000.f;
-        const void* PawnKey = nullptr;   // the body it died in (compared, never touched)
+        const void* PawnKey = nullptr;   
         bool bCredited = false;
         std::string DecidedBy;
         std::string Outcome;
     };
 
-    static std::map<void*, FSettledDeath> GSettledDeaths;   // victim player state -> how its last death was decided
+    static std::map<void*, FSettledDeath> GSettledDeaths;   
 
-    static int GElimsCredited = 0;             // kills handed to somebody
-    static int GElimsToNobody = 0;             // deaths with nobody to credit (a "no killer" line)
-    static int GElimsByGameReport = 0;         // decided by the game's own death report
-    static int GElimsBySweep = 0;              // decided by the bot code's dead-bot sweep
-    static int GElimsSecondReports = 0;        // the other route reporting a death that was already decided -- ignored
-    static int GElimPopupsSent = 0;            // "Eliminated <name>" popups sent to a real player
-    static int GElimPopupsNotSent = 0;         // ...that could not be sent
+    static int GElimsCredited = 0;             
+    static int GElimsToNobody = 0;             
+    static int GElimsByGameReport = 0;         
+    static int GElimsBySweep = 0;              
+    static int GElimsSecondReports = 0;        
+    static int GElimPopupsSent = 0;            
+    static int GElimPopupsNotSent = 0;         
 
-    // What the killfeed is told the death was. 1.8.2's EDeathCause: OutsideSafeZone 0, FallDamage 1, Pistol 2, Shotgun 3,
-    // Rifle 4, SMG 5, Sniper 6, Melee 7, Heavy 8, DBNOTimeout 9, Banhammer 10, RemovedFromGame 11, Unspecified 12. The
-    // game's own ToDeathCause only came with 4.19, so on 1.8.2 every kill used to go into the killfeed as an SMG kill.
     static bool DeathCauseIsWorkedOutHere()
     {
         return VersionInfo.EngineVersion < 4.19;
@@ -5896,7 +5495,6 @@ namespace BotAI
         return "cause " + std::to_string((int)Cause);
     }
 
-    // The 1.8.2 cause for a weapon, from its item's name. 255 = cannot tell.
     static uint8 DeathCauseFromWeapon(const UObject* WeaponDefinition)
     {
         if (!WeaponDefinition)
@@ -5939,8 +5537,6 @@ namespace BotAI
         return (AFortPlayerPawnAthena*)((AFortPlayerControllerAthena*)Owner)->Pawn;
     }
 
-    // The item behind whatever did the killing: the weapon the game names as the damage causer, or else the gun in the
-    // killer's hands.
     static const UObject* KillingWeaponDefinition(AActor* DamageCauser, AFortPlayerPawnAthena* KillerPawn)
     {
         if (DamageCauser && DamageCauser->IsA<AFortWeapon>())
@@ -5965,12 +5561,10 @@ namespace BotAI
         return nullptr;
     }
 
-    // "Eliminated <name>" on the killer's own screen. 1.8.2's ClientReportKill takes the victim's NAME (an FString);
-    // later builds take the victim's player state. Which one this build wants is read off the function itself.
     static bool ReportKillTo(AFortPlayerStateAthena* Killer, AFortPlayerStateAthena* Victim, const std::string& VictimName)
     {
         static UFunction* Fn = nullptr;
-        static int Kind = -1;               // 0 = the victim's name (FString), 1 = the victim's player state, 2 = unusable
+        static int Kind = -1;               
         static uint32 ParamOffset = 0;
         static uint32 ParamsSize = 0;
 
@@ -6021,7 +5615,6 @@ namespace BotAI
             return true;
         }
 
-        // The name exactly as the game has it (what every other part of the player's HUD shows), else ours.
         std::wstring Wide;
 
         if (const FString* Raw = PlayerNameField(Victim))
@@ -6047,7 +5640,6 @@ namespace BotAI
 
         Killer->ProcessEvent(Fn, Buffer);
 
-        // The RPC has copied it into the packet by now.
         if (Name.Data)
             FMemory::Free(Name.Data);
 
@@ -6057,14 +5649,14 @@ namespace BotAI
     struct FDeathFacts
     {
         AFortPlayerStateAthena* Victim = nullptr;
-        AFortPlayerStateAthena* Killer = nullptr;      // who the reporter says did it (nullptr: nobody)
-        AFortPlayerPawnAthena* VictimPawn = nullptr;   // the body, only while it is certainly still there
-        const void* PawnKey = nullptr;                 // the body it died in, for "is this the same death" only
+        AFortPlayerStateAthena* Killer = nullptr;      
+        AFortPlayerPawnAthena* VictimPawn = nullptr;   
+        const void* PawnKey = nullptr;                 
         AFortPlayerPawnAthena* KillerPawn = nullptr;
         AActor* DamageCauser = nullptr;
-        int Storm = -1;                                // 1 died in the storm, 0 did not, -1 work it out here
+        int Storm = -1;                                
         bool bFromGameReport = false;
-        std::string How;                               // how the reporter got to that killer
+        std::string How;                               
         FVector Where{};
         bool bHaveWhere = false;
     };
@@ -6101,7 +5693,6 @@ namespace BotAI
         const char* DecidedBy = Facts.bFromGameReport ? "the game's own death report" : "the bot code's dead-bot sweep";
         const std::string VictimName = SafeNameOf(Victim);
 
-        // One death, one decision.
         const FSettledDeath* Earlier = nullptr;
 
         if (DeathIsAlreadySettled(Victim, Facts.PawnKey, Now, &Earlier))
@@ -6116,7 +5707,6 @@ namespace BotAI
             return false;
         }
 
-        // Is the one the reporter names really somebody to credit?
         auto Killer = Facts.Killer;
         std::string NoKillerBecause = Facts.How.empty() ? std::string("no damage from another player on record") : Facts.How;
 
@@ -6143,8 +5733,6 @@ namespace BotAI
         if (Storm < 0)
             Storm = (Victim->HasOwner() && Victim->Owner && DiedToTheStorm((void*)Victim->Owner, GStormTick)) ? 1 : 0;
 
-        // The sweep's own reading: outside the circle with no damage from anybody in the last 5 seconds means the storm
-        // finished it, whoever hit it before. (The game's own report is trusted as it is.)
         if (Killer && Storm == 1 && !Facts.bFromGameReport)
         {
             Killer = nullptr;
@@ -6154,7 +5742,6 @@ namespace BotAI
         if (!Killer && Storm == 1 && NoKillerBecause.find("storm") == std::string::npos)
             NoKillerBecause += ", in the storm";
 
-        // What the killfeed is told.
         uint8 Cause = 0;
         std::string CauseFrom;
 
@@ -6212,7 +5799,7 @@ namespace BotAI
                 Victim->DeathInfo.DeathLocation = Facts.Where;
             if (!Facts.bFromGameReport)
             {
-                // The game's own report path has filled these in already (ClientOnPawnDied).
+                
                 if (FDeathInfo::HasDeathTags())
                     Victim->DeathInfo.DeathTags = *SourceTags;
                 if (FDeathInfo::HasVictimTags() && Facts.VictimPawn)
@@ -6285,7 +5872,6 @@ namespace BotAI
                     Killer->ClientReportTeamKill(Killer->TeamKillScore);
             }
 
-            // Siphon for whoever got the elim of a bot (bots and real players): 50 total, health first, the rest shield.
             const bool bVictimIsBot = Victim->HasbIsABot() && Victim->bIsABot;
 
             if (bVictimIsBot && FConfiguration::SiphonAmount > 0)
@@ -6329,7 +5915,6 @@ namespace BotAI
             return true;
         }
 
-        // Nobody to credit.
         const FString* Raw = PlayerNameField(Victim);
         const int Pick = NoKillerMessages::PickFor((Raw && Raw->CStr()) ? Raw->CStr() : L"", Raw ? Raw->Num() : 0);
         const std::string Line = NoKillerMessages::LineUtf8(Pick, VictimName.empty() ? std::string("someone") : VictimName);
@@ -6338,19 +5923,12 @@ namespace BotAI
         Settled.bCredited = false;
         Settled.Outcome = "nobody got the elim: \"" + Line + "\"";
 
-        // Only the gameserver log and the killfeed get this line (the client DLL puts it in the killfeed) -- not the server's
-        // console window, and not anybody's game console.
         LogLine("[ELIM] %s -- nobody gets the elim (%s; decided by %s) | killfeed: %s (%s), no kill for anyone.",
                 Line.c_str(), NoKillerBecause.c_str(), DecidedBy, DeathCauseName(Cause).c_str(), CauseFrom.c_str());
 
         return false;
     }
 
-    // ---- the dead-bot sweep's deaths, decided a second later ----------------------------------------------------
-    //
-    // The sweep notices a bot is down by looking at it every tick, and that can be a moment before the game gets round to
-    // its own death report. So the sweep writes down what it saw (who really damaged the bot, whether it was in the storm,
-    // where it was) and waits one second: if the game's report has decided the death by then, that stands.
     struct FSweepDeath
     {
         AFortPlayerStateAthena* Victim = nullptr;
@@ -6478,7 +6056,6 @@ namespace BotAI
         GSweepDeaths.swap(StillWaiting);
     }
 
-    // Called by the game's own death report (FortPlayerControllerAthena.cpp, ClientOnPawnDied) for every death.
     bool SettleEliminationFromGameReport(AFortPlayerStateAthena* Victim, AFortPlayerStateAthena* Killer, AFortPlayerPawnAthena* VictimPawn,
                                          AFortPlayerPawnAthena* KillerPawn, AActor* DamageCauser)
     {
@@ -6493,9 +6070,6 @@ namespace BotAI
         Facts.bFromGameReport = true;
         Facts.How = Killer ? "the killer the game named" : "the game named no killer";
 
-        // Round 5: the game named nobody, but a bot hit this player with the bot code's own damage (BotHitTarget) in the 5
-        // seconds before -- that bot's elimination (the finishing hit goes through ForceKill, naming the bot; this is for a
-        // report that does not carry that through).
         if (!Killer && Victim && Victim->HasOwner() && Victim->Owner)
         {
             auto Hit = BotCodeLastHit.find((void*)Victim->Owner);
@@ -6532,16 +6106,11 @@ namespace BotAI
                 GElimPopupsSent, GElimPopupsNotSent, GElimsFromLedger);
     }
 
-    // ---- what the player's own game showed (the 1.8.2 client DLL sends it with "cheat clientlog <text>") -----------
-    //
-    // A log line saying the server sent something is not proof the player saw it. The client DLL reports what its own
-    // killfeed, "Eliminated" popup and storm timer really showed, and F7 turbo building, and it lands here as [CLIENT].
     void LogFromClient(AFortPlayerControllerAthena* Controller, const char* Text)
     {
         if (!Controller || !Text)
             return;
 
-        // A flood guard: no client gets more than 40 lines into the log in any 10 seconds.
         struct FBudget
         {
             float WindowStart = -100.f;
@@ -6586,9 +6155,6 @@ namespace BotAI
         LogLine("[CLIENT] '%s': %s", Who.c_str(), Clean.c_str());
     }
 
-    // A bot the sweep found dead with its body already gone. It drops its loot, its bookkeeping is cleared, and who (if
-    // anybody) gets the elimination is decided by SettleElimination -- after the game's own death report has had a
-    // second to decide it first.
     static void HandleBotDeath(AFortPlayerControllerAthena* DeadBotController)
     {
         auto World = UWorld::GetWorld();
@@ -6601,12 +6167,8 @@ namespace BotAI
 
         auto DeadPawn = (AFortPlayerPawnAthena*)DeadBotController->Pawn;
 
-        // Before anything below forgets who damaged it, or where it was.
         QueueSweepDeath(DeadBotController, DeadPawn, GameState);
 
-        // This is the other route a bot can die down, and it used to drop nothing at all. It has to
-        // happen before the last known position is forgotten below, because once the game has taken
-        // the body away that is the only thing left to drop onto.
         DropBotLoot(DeadBotController, DeadPawn);
 
         BotTopDamager.erase((void*)DeadBotController);
@@ -6624,7 +6186,6 @@ namespace BotAI
         LastKnownLocation.erase((void*)DeadBotController);
     }
 
-    // Still on the spawn island: the game has not reached its real aircraft phase (EAthenaGamePhase::Aircraft, 3) yet.
     static bool StillOnTheSpawnIsland(AFortGameStateAthena* GameState)
     {
         if (!GameState || !GameState->HasGamePhase())
@@ -6670,9 +6231,6 @@ namespace BotAI
             if (Pawn->HasLastFallDistance())
                 Pawn->LastFallDistance = 0.f;
 
-            // Nobody takes damage before the bus. AircraftPhaseReached() goes by GamePhase_Aircraft (2), and 2 is the warmup
-            // (EAthenaGamePhase: None 0, Setup 1, Warmup 2, Aircraft 3), so it said "the aircraft phase has started" the whole
-            // time everyone was on the spawn island -- and the bots could be killed there.
             const bool bProtected = !AircraftPhaseReached() || StillOnTheSpawnIsland(GameState);
 
             static bool bProtectionSeen = false;
@@ -6695,7 +6253,6 @@ namespace BotAI
 
                 const float Health = Pawn->GetHealth();
 
-                // Proof the protection really holds: a bot that loses health here anyway is reported.
                 if (bKnownBot && Health < 100.f)
                 {
                     static int HurtReports = 0;
@@ -6732,9 +6289,6 @@ namespace BotAI
                 {
                     HumanPawnToppedUp[(void*)Owner] = (void*)Pawn;
 
-                    // The game hands out the pawn and then fills in its stats, and it does not always
-                    // do both in the same tick. So keep putting the shield back for a moment rather
-                    // than setting it once and hoping.
                     HumanTopUpUntilTick[(void*)Owner] = GStormTick + 60;
 
                     LogLine("[PROTECT] Real player on a new pawn -- 100 health and 100 shield.");
@@ -6749,8 +6303,6 @@ namespace BotAI
                     if (Pawn->GetHealth() < 100.f)
                         Pawn->SetHealth(Full);
 
-                    // Only while the game still has them on nothing. If they have picked any shield up
-                    // or been shot since, that is theirs and we leave it alone.
                     if (Pawn->GetShield() <= 0.f)
                         Pawn->SetShield(Full);
                 }
@@ -6807,7 +6359,6 @@ namespace BotAI
         if (!GameState->HasPlayerArray() || !GameMode->HasAlivePlayers())
             return;
 
-        // Deaths the sweep saw a second ago that the game's own death report has not decided: decided now.
         DecideSweepDeaths();
 
         int removed = 0;
@@ -6880,14 +6431,6 @@ namespace BotAI
                 EliminatedBots.insert((void*)Controller);
                 removed++;
 
-                // The old version of this lived here in full. It did the job, but a bot that died
-                // with its body already gone hit a bare "break" and stopped the loop over every
-                // other bot for that tick, and what it did drop included the pickaxe and nothing
-                // else worth walking over for. This is the same job done in one place, for both of
-                // the routes a bot can die down.
-                // Who (if anybody) gets this one is decided by SettleElimination: the game's own death report gets a second
-                // to decide it first, and this sweep's own reading -- real damage in the last 15 seconds, or nobody -- is
-                // written down now, before the bookkeeping below forgets it.
                 QueueSweepDeath(Controller, Pawn, GameState);
 
                 DropBotLoot(Controller, Pawn);
@@ -7060,24 +6603,11 @@ namespace BotAI
         }
     }
 
-    // Item lookup by short name ("AthenaAmmoDataShells", "WoodItemData", "Athena_Bandage", "WID_...").
-    //
-    // This used to search the weapon folders and the top of the consumables folder only. On 14.60 the
-    // ammo lives in /Game/Athena/Items/Ammo/, the building materials in /Game/Items/ResourcePickups/ and
-    // every heal in a folder of its own (/Game/Athena/Items/Consumables/Bandage/Athena_Bandage...), so
-    // all of those came back "not found in any known folder" -- the server log shows exactly that for
-    // every ammo type and every material. That is why a bot's inventory only ever held its gun and a
-    // dead bot dropped ONE pickup, while the 22.40 server drops ten. Each kind of item is now looked for
-    // first in the folder it really lives in (the same paths this build's own LateGame.cpp loads), then
-    // in the general list, and finally among whatever is already loaded.
     static const UFortItemDefinition* FindItemDefByName(const wchar_t* name)
     {
         if (!name || !*name)
             return nullptr;
 
-        // Hits are kept for good. A miss is only remembered for 30 seconds: long enough that a lobby full
-        // of bots asking for the same missing thing in one tick costs one search instead of a hundred,
-        // short enough that it is tried again later in case something has loaded it by then.
         static std::map<std::wstring, const UFortItemDefinition*> cache;
         static std::map<std::wstring, std::chrono::steady_clock::time_point> missedAt;
 
@@ -7112,17 +6642,16 @@ namespace BotAI
 
         if (n[0] == L'/')
         {
-            // Already a full object path.
+            
             if (TryPath(n))
                 How = "full path";
         }
         else
         {
-            // 0) The old first try, kept as it was.
+            
             if (TryPath(n + L"." + n))
                 How = "short path";
 
-            // 1) Straight to the folder this kind of item lives in on 14.60.
             std::wstring Likely;
 
             if (StartsWith(L"AthenaAmmoData") || StartsWith(L"AmmoData"))
@@ -7130,14 +6659,13 @@ namespace BotAI
             else if (n == L"WoodItemData" || n == L"StoneItemData" || n == L"MetalItemData")
                 Likely = L"/Game/Items/ResourcePickups/";
             else if (StartsWith(L"Athena_") && n.size() > 7)
-                Likely = L"/Game/Athena/Items/Consumables/" + n.substr(7) + L"/";   // Athena_Bandage -> Consumables/Bandage/
+                Likely = L"/Game/Athena/Items/Consumables/" + n.substr(7) + L"/";   
             else if (StartsWith(L"WID_"))
                 Likely = L"/Game/Athena/Items/Weapons/";
 
             if (!found && !Likely.empty() && TryPath(Likely + n + L"." + n))
                 How = "its own folder";
 
-            // 2) The general folder list (now including the ammo and material folders).
             if (!found)
             {
                 static const wchar_t* folders[] = {
@@ -7155,7 +6683,7 @@ namespace BotAI
                 for (auto f : folders)
                 {
                     if (Likely == f)
-                        continue;   // already tried just above
+                        continue;   
 
                     if (TryPath(std::wstring(f) + n + L"." + n))
                     {
@@ -7165,11 +6693,9 @@ namespace BotAI
                 }
             }
 
-            // 3) The old bare-name try.
             if (!found && TryPath(n))
                 How = "bare name";
 
-            // 4) Already loaded somewhere we did not guess.
             if (!found)
             {
                 std::string narrowName(n.begin(), n.end());
@@ -7295,17 +6821,6 @@ namespace BotAI
         return NewInv;
     }
 
-    // ==== the bots' loot: the game's own loot tables (round 5) =====================================================
-    //
-    // Every bot used to get the same fixed kit -- a gold SCAR, a grey pump, a gold bolt-action, two slurps and a grenade --
-    // so every bot in the match fought with a gold SCAR (the [ARMS] lines: 99 of 99). And not one of them had a spare
-    // round on it, so the game's own reload had nothing to load and never started (61 reloads in the last log, 60 of them
-    // the bot code's own, which is what left the guns unable to fire again -- see BotReissueGun).
-    //
-    // Now each bot gets what the game's own loot tables give -- a few chests' worth, from the tier group this server's
-    // chests use (the lootpool): up to three guns of different kinds, each with a full magazine, the matching spare rounds
-    // for every gun, and the heals the rolls turned up. (This server's ammo never runs out -- bInfiniteAmmo -- but a
-    // reload still checks that there is some.) Whatever a bot carries is what it drops when it is eliminated.
     enum EBotGunKind
     {
         BotGun_None = 0,
@@ -7314,7 +6829,7 @@ namespace BotAI
         BotGun_Pistol,
         BotGun_Shotgun,
         BotGun_Smg,
-        BotGun_Rifle,      // the higher, the more a bot wants it in its hands for a fight (they fight at around 14 m)
+        BotGun_Rifle,      
         BotGun_KindCount
     };
 
@@ -7334,7 +6849,6 @@ namespace BotAI
         return Name;
     }
 
-    // A gun a bot can fight with -- a WID_ ranged weapon (heals, grenades and traps are not WID_ on this build), by its name.
     static int BotGunKindOf(const UFortItemDefinition* Def)
     {
         if (!Def || !((const UObject*)Def)->IsA<UFortWeaponItemDefinition>() || ((const UObject*)Def)->IsA<UFortWeaponMeleeItemDefinition>())
@@ -7364,7 +6878,6 @@ namespace BotAI
         return BotGun_None;
     }
 
-    // 1 common .. 5 legendary, from the name (WID_..._C_, _UC_, _R_, _VR_, _SR_), 0 if it does not say.
     static int BotGunRarity(const UFortItemDefinition* Def)
     {
         const std::string Name = LowerObjectName((const UObject*)Def);
@@ -7383,7 +6896,6 @@ namespace BotAI
         return 0;
     }
 
-    // Which gun it takes out to fight with: the kind first (rifle, SMG, shotgun, pistol, sniper, launcher), then rarity.
     static int BotGunScore(const UFortItemDefinition* Def)
     {
         const int Kind = BotGunKindOf(Def);
@@ -7432,7 +6944,6 @@ namespace BotAI
     static int GBotLootGuns[BotGun_KindCount] = {};
     static int GBotLootRarity[6] = {};
 
-    // The tier group the chests on this build use (FortLootPackage.cpp redirects the old "Loot_Treasure" to it).
     static bool ResolveBotLootGroup()
     {
         if (GBotLootGroupResolved)
@@ -7464,7 +6975,6 @@ namespace BotAI
         return false;
     }
 
-    // A few chests' worth of loot: up to 3 guns, no two of the same kind, and up to 2 stacks of heals and the like.
     static void RollBotLoot(std::vector<const UFortItemDefinition*>& OutGuns, std::vector<std::pair<const UFortItemDefinition*, int>>& OutOther,
                             int& OutRolls)
     {
@@ -7507,7 +7017,6 @@ namespace BotAI
                     continue;
                 }
 
-                // Its spare rounds come with each gun; building materials and traps are not worth carrying for a bot.
                 if (((const UObject*)Def)->IsA<UFortAmmoItemDefinition>() || ((const UObject*)Def)->IsA<UFortResourceItemDefinition>() ||
                     ((const UObject*)Def)->IsA<UFortWeaponItemDefinition>() || LowerObjectName((const UObject*)Def).find("trap") != std::string::npos)
                     continue;
@@ -7518,14 +7027,11 @@ namespace BotAI
 
             Drops.Free();
 
-            // Two guns after three chests is a looted player; keep going only while it has fewer.
             if (Roll >= 2 && OutGuns.size() >= 2)
                 break;
         }
     }
 
-    // A gun's spare rounds: four magazines' worth, at least 6, never more than one stack holds -- unless it already carries
-    // that ammo. Says what it gave, for the log.
     static std::string GiveBotSpareRounds(AFortInventory* Inventory, const UFortItemDefinition* Gun)
     {
         auto Ammo = BotGunAmmo(Gun);
@@ -7547,8 +7053,6 @@ namespace BotAI
         return " + " + BotObjectName((const UObject*)Ammo) + " x" + std::to_string(Spare);
     }
 
-    // Into the bot's own inventory (its controller's WorldInventory -- what the game reloads from and what it drops).
-    // Returns how many guns it got; 0 means the caller hands out the old fixed kit.
     static int GiveBotLootpoolKit(AFortPlayerControllerAthena* Controller, AFortPlayerStateAthena* PlayerState)
     {
         auto Inventory = Controller ? Controller->WorldInventory : nullptr;
@@ -7631,14 +7135,13 @@ namespace BotAI
         if (!GameState->HasPlayerArray())
             return;
 
-        // Fixed 1.8.2-era loadout (user-specified)
         static const wchar_t* FixedWeapons[] = {
             L"WID_Assault_AutoHigh_Athena_SR_Ore_T03",
             L"WID_Shotgun_Standard_Athena_C_Ore_T03",
             L"WID_Sniper_BoltAction_Scope_Athena_SR_Ore_T03",
         };
         static const wchar_t* FixedConsumables[] = {
-            L"Athena_PurpleStuff",   // x2
+            L"Athena_PurpleStuff",   
             L"Athena_PurpleStuff",
             L"Athena_Grenade",
         };
@@ -7664,12 +7167,9 @@ namespace BotAI
             if (!Pawn)
                 continue;
 
-            // Only after landed / on ground when possible
             if (Pawn->HasbIsSkydiving() && Pawn->bIsSkydiving)
                 continue;
 
-            // The game's own loot tables first, like the bots SpawnBots makes (round 5); ArmLandedBots then takes its best
-            // gun out. The fixed kit below only if they give no gun.
             if (Controller->WorldInventory && GiveBotLootpoolKit(Controller, PS) > 0)
             {
                 BotInventories[(void*)PS] = Controller->WorldInventory;
@@ -7684,7 +7184,6 @@ namespace BotAI
             bool gaveAny = false;
             FGuid primaryGuid{};
 
-            // Weapons
             for (auto WName : FixedWeapons)
             {
                 auto WeaponDef = FindItemDefByName(WName);
@@ -7716,7 +7215,6 @@ namespace BotAI
                         gaveAny = true;
                     }
 
-                    // ...and the rounds to reload it with.
                     GiveBotSpareRounds(Inv, WeaponDef);
                 }
 
@@ -7727,14 +7225,12 @@ namespace BotAI
                 }
             }
 
-            // Equip first resolved weapon
             if (auto FirstDef = FindItemDefByName(FixedWeapons[0]))
             {
                 Pawn->EquipWeaponDefinition(FirstDef, primaryGuid);
                 BotWeaponClipSize[(void*)PS] = 30;
             }
 
-            // Consumables
             for (auto CName : FixedConsumables)
             {
                 auto ConsDef = FindItemDefByName(CName);
@@ -8346,19 +7842,17 @@ namespace BotAI
             "PrintHelloWorld",
             "Alper is the goat",
         };
-        // Pick 99 names at random from the big list once per match so the bus / player list
-        // only shows a normal lobby-sized set, not every name in the pool.
+
         static std::vector<std::string> ActiveNames;
         static size_t ActiveNamesUsed = 0;
         static bool bActiveNamesReady = false;
 
-        // In every match, not only the ones it happens to be drawn in (99 of the 500-odd names make it each time).
         static const char* AlwaysInTheLobby = "Alper is the goat";
 
         if (!bActiveNamesReady && !SpecialNames.empty())
         {
             ActiveNames = SpecialNames;
-            // Fisher-Yates shuffle
+            
             for (size_t i = ActiveNames.size(); i > 1; --i)
             {
                 size_t j = (size_t)(rand() % (int)i);
@@ -8410,7 +7904,6 @@ namespace BotAI
             GameMode->ChangeName(Controller, FString(WideName.c_str()), true);
             PlayerState->OnRep_PlayerName();
 
-            // Read back what the game really stored -- the name every client is sent, the killfeed and the popups use.
             static int NamedSoFar = 0;
             const std::string ReadBack = NameAsStored(PlayerState);
 
@@ -8419,17 +7912,6 @@ namespace BotAI
         }
     }
 
-    // ---- dressing the bots on 1.8.2 -----------------------------------------------------------------------------
-    //
-    // Season 1 has no CharacterData: what a player looks like is the six part slots on their PlayerState
-    // (CharacterParts: head, body, hat, backpack, charm, face) plus the hero they play (HeroType). A pawn whose
-    // PlayerState has no parts has no body to draw -- the bots were in the match (the HUD counted every one of them)
-    // but nobody could see a single one.
-    //
-    // This dresses them the way Magnesium dresses the bots it spawns on these builds: a Season 1 outfit (a CID's hero
-    // and its parts; the default commando parts if no CID can be found), written to the PlayerState, chosen on the pawn
-    // with the game's own ServerChoosePart, applied with the game's own ApplyCharacterCustomization (the same call this
-    // server makes for the real player's look), then announced to the clients.
     static const wchar_t* GSeasonOneOutfits[] = {
         L"CID_001_Athena_Commando_F_Default", L"CID_002_Athena_Commando_F_Default", L"CID_003_Athena_Commando_F_Default",
         L"CID_004_Athena_Commando_F_Default", L"CID_005_Athena_Commando_M_Default", L"CID_006_Athena_Commando_M_Default",
@@ -8446,17 +7928,11 @@ namespace BotAI
     {
         const UObject* Hero = nullptr;
         const UObject* Parts[6] = {};
-        uint8 Gender = 2;      // EFortCustomGender: 1 male, 2 female
-        uint8 BodyType = 0;    // EFortCustomBodyType on 4.16: 1 small, 2 medium, 4 large (0 = leave the PlayerState's alone)
+        uint8 Gender = 2;      
+        uint8 BodyType = 0;    
         std::string Name;
     };
 
-    // One element of a TArray<TSoftObjectPtr<...>>, resolved -- and loaded if it is not in memory yet. A soft pointer is
-    // 0x20 bytes on 4.16 (weak pointer, tag, the path as a string) and 0x28 on later engines, and the SDK lays
-    // TSoftObjectPtr out the later way: indexing such an array on 1.8.2 read every element after the first from the
-    // middle of the one before it. That is why every bot came out with a single part -- a body and no head -- and why
-    // the outfit lookup faulted on the second CID (the [GUARD] fault #1 right before the first bot was dressed),
-    // which left CID_001 as the only outfit.
     template <typename T>
     static const UObject* SoftArrayAt(TArray<TSoftObjectPtr<T>>& Array, int Index, const UClass* Class)
     {
@@ -8473,7 +7949,6 @@ namespace BotAI
         return std::string(Name.c_str());
     }
 
-    // The body types a part allows (a mask on 4.16: 1 small, 2 medium, 4 large), or 0 if it cannot be read.
     static uint8 PartBodyTypes(const UObject* Part)
     {
         static int32 Offset = -2;
@@ -8491,7 +7966,6 @@ namespace BotAI
         return (Mask >= 1 && Mask <= 7) ? Mask : 0;
     }
 
-    // Why a CID could not be used: 1 not on this build, 2 no hero, 3 no specializations, 4 no body, 9 faulted.
     static bool ResolveOneOutfitRaw(const wchar_t* Id, FBotOutfit* Out, int* Reason)
     {
         std::wstring Wide(Id);
@@ -8564,10 +8038,10 @@ namespace BotAI
         }
     }
 
-    static std::vector<FBotOutfit> GBotOutfits;        // the Season 1 outfits found on this build
+    static std::vector<FBotOutfit> GBotOutfits;        
     static bool GBotOutfitsResolved = false;
-    static std::map<void*, int> BotOutfitOf;           // bot PlayerState -> its outfit (kept for the whole match)
-    static std::map<void*, void*> DressedBotPawns;     // bot pawn -> the PlayerState it was dressed for
+    static std::map<void*, int> BotOutfitOf;           
+    static std::map<void*, void*> DressedBotPawns;     
     static int GBotsDressed = 0;
     static bool GPartChoiceBroken = false;
     static bool GCustomizationBroken = false;
@@ -8606,8 +8080,6 @@ namespace BotAI
             Skipped += std::string(Wide.begin(), Wide.end()) + " (" + Reasons[(Reason >= 0 && Reason <= 9) ? Reason : 0] + ")";
         }
 
-        // A body needs a head. Where a hero brings none, the head of another outfit of the same gender (for the women,
-        // failing that, the default head the real player gets).
         const UObject* FemaleHead = nullptr;
         const UObject* MaleHead = nullptr;
 
@@ -8644,8 +8116,6 @@ namespace BotAI
                 continue;
             }
 
-            // The body type both the head and the body allow -- medium where they can, which is what the default
-            // commando parts are. A PlayerState the bot code made starts with none at all.
             if (VersionInfo.EngineVersion <= 4.16)
             {
                 uint8 Allowed = 7;
@@ -8665,8 +8135,7 @@ namespace BotAI
 
         if (GBotOutfits.empty())
         {
-            // The parts this server already gives a real player who has no hero of their own (SpawnDefaultPawnFor),
-            // with Magnesium's default commando hero -- Magnesium's own default look for its bots.
+
             FBotOutfit Default{};
             Default.Hero = FindObject<UObject>(L"/Game/Athena/Heroes/HID_001_Athena_Commando_F.HID_001_Athena_Commando_F");
             if (!Default.Hero)
@@ -8690,7 +8159,6 @@ namespace BotAI
         if (Faults > 0)
             LogLine("[DRESS] Reading %d CID(s) faulted -- caught, those outfits are left out.", Faults);
 
-        // What each outfit really is, so a headless bot can be traced to the outfit it wore.
         for (size_t i = 0; i < GBotOutfits.size() && i < 6; i++)
         {
             const auto& Outfit = GBotOutfits[i];
@@ -8747,7 +8215,6 @@ namespace BotAI
         }
     }
 
-    // A function that takes one byte (an enum), e.g. ServerChooseGender(EFortCustomGender). False if it is not there.
     static bool InvokeOneByteRaw(const UObject* Object, const char* FunctionName, uint8 Value)
     {
         auto Fn = Object ? Object->GetFunction(FunctionName) : nullptr;
@@ -8781,7 +8248,6 @@ namespace BotAI
         }
     }
 
-    // Turns on a reflected bool (a real bool or a bitfield one) by name.
     static bool SetReflectedBool(UObject* Object, const char* Name)
     {
         auto Prop = Object ? Object->GetProperty(Name, 0x20000) : nullptr;
@@ -8851,9 +8317,6 @@ namespace BotAI
                 Slots[s] = Outfit.Parts[s];
         };
 
-        // 1. The outfit on the PlayerState: the six part slots (what clients build the body from), the hero and the
-        //    gender. A PlayerState the bot code made starts with everything zeroed, the backpack and head-accessory
-        //    switches included, so those are turned on as well.
         WriteStateParts();
 
         if (PlayerState->HasHeroType() && Outfit.Hero)
@@ -8865,14 +8328,12 @@ namespace BotAI
         if (GenderOffset >= 0)
             GetFromOffset<uint8>(PlayerState, (uint32)GenderOffset) = Outfit.Gender;
 
-        // ...and the body type, which a PlayerState the bot code made has none of (0 is not a body type on this build).
         if (BodyTypeOffset >= 0 && Outfit.BodyType)
             GetFromOffset<uint8>(PlayerState, (uint32)BodyTypeOffset) = Outfit.BodyType;
 
         SetReflectedBool((UObject*)PlayerState, "bShowHeroBackpack");
         SetReflectedBool((UObject*)PlayerState, "bShowHeroHeadAccessories");
 
-        // 2. Chosen on the pawn with the game's own call.
         int Chosen = 0;
         if (!GPartChoiceBroken)
         {
@@ -8892,7 +8353,6 @@ namespace BotAI
             }
         }
 
-        // ...and the gender (Magnesium does this right after the parts on these builds).
         if (!GPartChoiceBroken)
         {
             bool bFaulted = false;
@@ -8905,7 +8365,6 @@ namespace BotAI
             }
         }
 
-        // 3. Applied the way this server applies the real player's look.
         bool bApplied = false;
         if (ApplyCharacterCustomization && !GCustomizationBroken)
         {
@@ -8918,9 +8377,6 @@ namespace BotAI
             }
         }
 
-        // 4. The slots written again (any of the above can reset them), and the change announced: the hero, the pawn's
-        //    PlayerState (on these builds that is what rebuilds the body), the parts, the two switches. The pawn's own
-        //    copy of the parts last of all, as Magnesium does -- filling it earlier makes the game skip the rebuild.
         WriteStateParts();
 
         if (!GDressNotifyBroken)
@@ -8964,7 +8420,6 @@ namespace BotAI
                 if (Outfit.Parts[s])
                     Parts++;
 
-            // Read back from the PlayerState itself -- what the clients are sent, not what was meant.
             auto Slots = (const UObject**)((uint8*)PlayerState + StatePartsOffset);
 
             LogLine("[DRESS] '%s' dressed as %s (%d part(s), %d chosen on the pawn, customization %s) | the PlayerState now holds: head %s, "
@@ -9150,7 +8605,7 @@ namespace BotAI
         if (!GameState->HasPlayerArray())
             return;
 
-        int DressedThisTick = 0;   // 1.8.2 dressing loads parts the first time round: a few bots a tick
+        int DressedThisTick = 0;   
 
         for (int i = 0; i < GameState->PlayerArray.Num(); i++)
         {
@@ -9158,8 +8613,6 @@ namespace BotAI
             if (!PlayerState || !PlayerState->HasbIsABot() || !PlayerState->bIsABot || NPCs::IsNPC(PlayerState))
                 continue;
 
-            // 1.8.2 and the other early builds have no CharacterData: the look lives in the PlayerState's six part slots.
-            // This used to skip every bot here, so on 1.8.2 not one of them was ever dressed (DressBotSeasonOne).
             if (!PlayerState->HasCharacterData())
             {
                 auto SeasonOneController = (AFortPlayerControllerAthena*)PlayerState->Owner;
@@ -9241,7 +8694,6 @@ namespace BotAI
 
     static std::map<void*, FVector> BotWanderGoals;
 
-    // Per-bot aim error, held for a stretch of ticks so bursts miss consistently (see the combat code).
     static std::map<void*, FVector> BotAimError;
     static std::map<void*, int> BotAimErrorTick;
 
@@ -9350,14 +8802,6 @@ namespace BotAI
         return ClipSize;
     }
 
-    // ---- the game's own built-in bot senses ------------------------------------------------------------
-    //
-    // These bots run on Epic's own bot controller, which comes with its own senses (sight, hearing, being
-    // shot) feeding its own target picker -- and that turns the bot to aim at whoever IT picked, behind the bot
-    // code's back (Epic's aiming code is what writes all the "AimingDigestedSkillSet ... couldn't find valid
-    // value" lines). Nothing in this project uses those senses -- the bot code has its own eyes (BotCanSee) --
-    // so they are switched off, and the only thing that picks a bot's target is the bot code's lock-on.
-
     class BAIPerceptionComponent : public UObject
     {
     public:
@@ -9388,8 +8832,6 @@ namespace BotAI
         Senses->ForgetAll();
     }
 
-    // The engine calls on their own, inside their own fault guard: if this build ever faults in them, the senses
-    // are simply left alone for the rest of the match, instead of a fault throwing away bot ticks.
     static bool SilenceSensesGuarded(UObject* Perception, UClass** Classes, int Count)
     {
         __try
@@ -9476,26 +8918,11 @@ namespace BotAI
                     "bot code's lock-on picks targets now.", SensesFound);
     }
 
-    // ---- making a player-controller bot's gun go off -------------------------------------------------------------
-    //
-    // A gun fires through the game's ability system, and the ability system decides who runs an ability by asking
-    // "is this one locally controlled?". For a player that means "is this the player's own game", and on a dedicated
-    // server no player controller ever is -- so when a bot pulled the trigger, the ability system asked the bot's game
-    // client to fire the gun (ClientTryActivateAbility), and a bot has no game client: nothing happened. An ability
-    // system with no player controller in it is run by the server itself -- that is how the game runs its own AI and
-    // Save the World's defenders, with the same guns. So once a bot is on the ground and may fight, the "player
-    // controller" in its ability system is cleared -- checked, and done again if needed, every tick, because the game
-    // puts it back whenever the bot gets a pawn.
-    //
-    // FGameplayAbilityActorInfo: OwnerActor +0x08, AvatarActor +0x10, PlayerController +0x18, AbilitySystemComponent
-    // +0x20, each a weak pointer {index, serial}. The ability system component's pointer to it is not reflected, so it
-    // is found once: the one pointer in the component that points at exactly this bot's owner, controller and
-    // component.
-    static int32 GActorInfoOffset = -2;       // -2 = not looked for yet, -1 = not found (yet)
-    static int GActorInfoSearches = 0;        // looked for on this many bots (up to 5)
-    static uint32 GAscOwnerOffset = 0;        // 0 = not looked up yet, (uint32)-1 = not reflected
-    static int GActorInfoCleared = 0;         // times a bot's "player controller" was cleared (the game had put it back)
-    static std::set<void*> GBotsRunOnServer;  // bot controllers whose abilities the server runs
+    static int32 GActorInfoOffset = -2;       
+    static int GActorInfoSearches = 0;        
+    static uint32 GAscOwnerOffset = 0;        
+    static int GActorInfoCleared = 0;         
+    static std::set<void*> GBotsRunOnServer;  
 
     static void FindBotActorInfo(UObject* Asc, AActor* Owner, AActor* Controller)
     {
@@ -9541,7 +8968,6 @@ namespace BotAI
                     "game client it does not have to fire the gun; the [FIRE] lines below show whether any round goes off.");
     }
 
-    // 1 when the server runs this bot's abilities (its "player controller" cleared now, or already), 0 when it could not.
     static int LetTheServerRunBotAbilities(AFortPlayerControllerAthena* Controller, AFortPlayerStateAthena* PlayerState)
     {
         if (!Controller || !PlayerState || !PlayerState->HasAbilitySystemComponent())
@@ -9575,9 +9001,7 @@ namespace BotAI
 
         uint8* Info = *(uint8**)((uint8*)Asc + GActorInfoOffset);
 
-        // The component keeps the same actor info for as long as it lives: once a pointer has been checked readable, it
-        // is not checked again every tick.
-        static std::map<void*, void*> KnownReadable;   // ability system component -> its actor info, already checked
+        static std::map<void*, void*> KnownReadable;   
 
         if (!Info)
             return 0;
@@ -9592,7 +9016,6 @@ namespace BotAI
             KnownReadable[(void*)Asc] = (void*)Info;
         }
 
-        // Not this component's actor info after all: leave it alone.
         if (*(int32*)(Info + 0x08) != Owner->Index || *(int32*)(Info + 0x20) != Asc->Index)
             return 0;
 
@@ -9615,10 +9038,6 @@ namespace BotAI
         return PlayerControllerWeak[0] == -1 ? 1 : 0;
     }
 
-    // ---- the bot's "camera" ----------------------------------------------------------------------------------------
-    //
-    // Nothing ever moves a bot's camera (no game client sends it), and some of the gun's aiming asks the camera where it
-    // is and where it points. So while a bot aims, its camera is kept on its eyes, pointed where it aims.
     static bool GCameraResolved = false;
     static int32 GCamManagerOffset = -1, GCamCacheOffset = -1, GCamStampOffset = -1, GCamPovOffset = -1;
     static int32 GPovLocationOffset = -1, GPovRotationOffset = -1, GPovFovOffset = -1;
@@ -9630,7 +9049,7 @@ namespace BotAI
 
         if (!GCameraResolved)
         {
-            // Looked up the first time a bot that has a camera aims (a controller with no camera yet is skipped).
+            
             const uint32 ManagerOff = ((UObject*)Controller)->GetOffset("PlayerCameraManager");
             auto Manager = (ManagerOff != (uint32)-1) ? *(UObject**)((uint8*)Controller + ManagerOff) : nullptr;
 
@@ -9687,11 +9106,6 @@ namespace BotAI
         *(float*)(Cache + GCamStampOffset) = (Now > 0.f) ? Now : 1.f;
     }
 
-    // ---- pulling the trigger ------------------------------------------------------------------------------------------
-    //
-    // 0 = PawnStartFire / PawnStopFire as they are. If 4 bursts go by without the gun losing a single round, 1 = the same
-    // calls with the bot counted as a "local" player for the length of the call (the gun may only listen to the trigger
-    // of a player whose own game this is); if that does not fire a round in 4 bursts either, 2 = back to the plain calls.
     static int GTriggerMode = 0;
     static int32 GLocalFlagOffset = -2;
 
@@ -9753,20 +9167,16 @@ namespace BotAI
         }
     }
 
-    // ==== a gun's own numbers -- its row in the game's weapon data table (round 5) ================================
-    //
-    // Damage at each of the table's four distances, how many pellets a shot has, the gun's reload time, how many shots a
-    // second it fires, and whether it reloads one round at a time (a pump).
     struct FBotGunNumbers
     {
         bool bRead = false;
         bool bValid = false;
-        float Dmg[4] = {};        // DmgPB, DmgMid, DmgLong, DmgMaxRange
-        float Rng[4] = {};        // RngPB, RngMid, RngLong, RngMax (Unreal units)
-        int Pellets = 1;          // BulletsPerCartridge
+        float Dmg[4] = {};        
+        float Rng[4] = {};        
+        int Pellets = 1;          
         float ReloadTime = 0.f;
-        float FireRate = 0.f;     // FiringRate: shots a second
-        bool bOneRoundAtATime = false;   // bReloadIndividualBullets
+        float FireRate = 0.f;     
+        bool bOneRoundAtATime = false;   
     };
 
     static std::map<const void*, FBotGunNumbers> GBotGunNumbers;
@@ -9803,7 +9213,6 @@ namespace BotAI
                     Found++;
             }
 
-            // A bool: its byte and its bit.
             if (auto Prop = Struct ? Struct->GetProperty("bReloadIndividualBullets") : nullptr)
             {
                 const uint32 Off = Struct->GetOffset("bReloadIndividualBullets");
@@ -9858,8 +9267,6 @@ namespace BotAI
         return Numbers;
     }
 
-    // One round's damage at this distance: the table's falloff between its distances, a shotgun's pellets (fewer land the
-    // further away), never more than 150 a round.
     static float BotRoundDamage(const FBotGunNumbers& Numbers, float DistanceUnits)
     {
         if (!Numbers.bValid)
@@ -9885,11 +9292,10 @@ namespace BotAI
 
         if (Numbers.Pellets > 1)
         {
-            float Share = 0.95f - DistanceUnits / 2500.f;   // 0.9 point-blank, 0.55 at 10 m, at least 0.2
+            float Share = 0.95f - DistanceUnits / 2500.f;   
             if (Share < 0.2f)
                 Share = 0.2f;
 
-            // The number is per pellet -- unless it is clearly the whole shot's.
             Damage = (Damage * (float)Numbers.Pellets > 300.f) ? Damage * Share : Damage * (float)Numbers.Pellets * Share;
         }
 
@@ -9899,20 +9305,6 @@ namespace BotAI
         return Damage;
     }
 
-    // ==== bot bullets that hit (round 5) ============================================================================
-    //
-    // In the last two logs not one bot bullet ever hurt anybody: every burst that fired at all -- at 1, 5, 7, 14 m -- left
-    // its target's health and shield exactly where they were, no bot eliminated anybody all match, and 68 of the 84 bots
-    // that died were finished off by the storm while standing in front of each other. The gun goes off (rounds leave the
-    // magazine, its ability runs), but whatever the game does with a bot's shot never reaches the target.
-    //
-    // So the first bursts at each kind of target (bots, real players) are watched: a burst that fired, at close range, with
-    // the bot's aim on its target, and what the target lost. Once 5 such bursts land nothing at all (and none landed
-    // anything), the bot code deals that kind of target the damage itself from then on: every round that leaves the
-    // magazine while the aim is on target hits for the gun's own damage at that distance (BotRoundDamage), shield first.
-    // A hit that would finish the target off goes through the game's own ForceKill, naming the bot as the killer, so the
-    // elimination, the killfeed line and the popup are the game's own. If the game's own shots ever land, the bot code
-    // never adds any of its own for that kind of target.
     enum EBotDamageMode
     {
         BotDamage_Watching = 0,
@@ -9920,7 +9312,7 @@ namespace BotAI
         BotDamage_ByCode,
     };
 
-    static int GBotDamageMode[2] = { BotDamage_Watching, BotDamage_Watching };   // [0] bots, [1] real players
+    static int GBotDamageMode[2] = { BotDamage_Watching, BotDamage_Watching };   
     static int GBotDamageSamples[2] = { 0, 0 };
     static int GBotDamageSamplesLanded[2] = { 0, 0 };
     static int GCodeHits[2] = { 0, 0 };
@@ -9934,7 +9326,6 @@ namespace BotAI
         return Kind == 1 ? "real players" : "bots";
     }
 
-    // 1 a real player, 0 a bot, -1 neither/unknown.
     static int PawnTargetKind(AFortPlayerPawnAthena* Pawn)
     {
         if (!Pawn || !Pawn->Controller)
@@ -9947,17 +9338,15 @@ namespace BotAI
         return (State->HasbIsABot() && State->bIsABot) ? 0 : 1;
     }
 
-    // What each bot was aiming at as of its last tick: the rounds its gun lets go of before its next tick went out along
-    // that aim.
     struct FBotShotAim
     {
-        void* Target = nullptr;     // the pawn
-        bool bOnTarget = false;     // the aim, with its error (the 40% accuracy), lands on them
-        bool bCanShoot = false;     // in sight and in range
-        float Distance = 0.f;       // Unreal units
+        void* Target = nullptr;     
+        bool bOnTarget = false;     
+        bool bCanShoot = false;     
+        float Distance = 0.f;       
     };
 
-    static std::map<void*, FBotShotAim> BotShotAim;   // bot pawn -> its aim
+    static std::map<void*, FBotShotAim> BotShotAim;   
 
     static UFunction* GForceKillFn = nullptr;
     static bool GForceKillLooked = false;
@@ -9982,7 +9371,6 @@ namespace BotAI
         }
     }
 
-    // AFortPawn::ForceKill(DeathReason, KillerController, KillerActor): the game's own death, with the bot as the killer.
     static bool BotForceKill(AFortPlayerPawnAthena* Target, AFortPlayerControllerAthena* KillerController, AFortPlayerPawnAthena* KillerPawn)
     {
         if (GForceKillBroken || !Target)
@@ -10031,7 +9419,6 @@ namespace BotAI
         alignas(16) uint8 Params[0x100];
         memset(Params, 0, sizeof(Params));
 
-        // DeathReason stays an empty tag: the killfeed's cause comes from the killer's gun (SettleElimination).
         *(void**)(Params + GForceKillController) = (void*)KillerController;
         *(void**)(Params + GForceKillActor) = (void*)KillerPawn;
 
@@ -10045,8 +9432,6 @@ namespace BotAI
         return true;
     }
 
-    // One hit from a bot's round, dealt by the bot code: shield first, then health; the finishing one through ForceKill.
-    // True when this hit finished the target off (or it was already down).
     static bool BotHitTarget(AFortPlayerPawnAthena* Shooter, AFortPlayerControllerAthena* ShooterController, AFortPlayerStateAthena* ShooterState,
                              AFortPlayerPawnAthena* Target, float Damage, int Kind, const UFortItemDefinition* Gun)
     {
@@ -10063,9 +9448,8 @@ namespace BotAI
         const float Shield = Target->GetShield();
         const float FromShield = (Shield > 0.f) ? (Shield < Damage ? Shield : Damage) : 0.f;
         const float Rest = Damage - FromShield;
-        float NewHealth = Health - Rest;   // not const: the game's SetHealth takes it by address
+        float NewHealth = Health - Rest;   
 
-        // Real damage on record: the elimination credit (FindBotKiller, SettleElimination) and the bot's own fight.
         if (auto TargetController = (AActor*)Target->Controller)
         {
             BotCodeLastHit[(void*)TargetController] = { (void*)ShooterState, GStormTick };
@@ -10094,7 +9478,6 @@ namespace BotAI
             return false;
         }
 
-        // The finishing hit: the game's own death, with the bot named as the killer.
         const bool bForceKilled = BotForceKill(Target, ShooterController, Shooter);
 
         if (!bForceKilled)
@@ -10127,11 +9510,6 @@ namespace BotAI
                 GCodeKillsNotByForceKill);
     }
 
-    // ---- did the burst really fire? (the [FIRE] lines) -------------------------------------------------------------
-    //
-    // A log line saying "bursts fired" only says the bot code pulled the trigger. This watches each burst from the
-    // trigger going down to it coming back up: did the gun lose any rounds, did its ability run, and what happened to
-    // the target's health and shield.
     struct FBurstCheck
     {
         bool bOpen = false;
@@ -10146,16 +9524,15 @@ namespace BotAI
         float TargetLifeAtStart = -1.f;
         float Distance = 0.f;
         int Mode = 0;
-        int Ticks = 0;                // ticks it has been watched
-        bool bWeaponChanged = false;  // the bot had something else in its hands at some point
-        int EquippingAtStart = -1;    // the game's "equipping" flag on the gun when the trigger went down (-1 unknown)
-        int ReloadingAtStart = -1;    // ...and its "reloading" flag
-        int OnTargetRounds = 0;       // rounds that left the magazine with the aim on the target, in sight (round 5)
-        int TargetKind = -1;          // 0 a bot, 1 a real player
-        float Damage = 0.f;           // what the bot code dealt in this burst
+        int Ticks = 0;                
+        bool bWeaponChanged = false;  
+        int EquippingAtStart = -1;    
+        int ReloadingAtStart = -1;    
+        int OnTargetRounds = 0;       
+        int TargetKind = -1;          
+        float Damage = 0.f;           
     };
 
-    // Of the bursts with rounds in the gun that fired nothing: what the gun itself said when the trigger went down.
     static int GDryBurstsEquipping = 0;
     static int GDryBurstsReloading = 0;
     static int GDryBurstsNeither = 0;
@@ -10163,7 +9540,7 @@ namespace BotAI
     static int GunIsReloading(AActor* Weapon);
     static int GunIsEquipping(AActor* Weapon);
 
-    static std::map<void*, FBurstCheck> BotBurstChecks;   // bot pawn -> its burst going on now
+    static std::map<void*, FBurstCheck> BotBurstChecks;   
     static int GBurstsChecked = 0;
     static int GBurstsThatFired = 0;
     static int GBurstsInMode[2] = { 0, 0 };
@@ -10220,8 +9597,6 @@ namespace BotAI
         Check.TargetKind = PawnTargetKind(Target);
     }
 
-    // Rounds that left a bot's magazine since its last tick (round 5): with its aim on the target and the target in sight,
-    // each one is a hit -- dealt by the bot code once it is known that the game's own shots do not land (BotHitTarget).
     static void BotRoundsFired(AFortPlayerPawnAthena* Pawn, AFortPlayerStateAthena* PlayerState, FBurstCheck& Check, int Rounds, AActor* Weapon,
                                const std::set<void*>& LivePawns)
     {
@@ -10259,18 +9634,17 @@ namespace BotAI
             Check.Damage += PerRound;
 
             if (BotHitTarget(Pawn, Controller, PlayerState, Target, PerRound, Kind, Gun))
-                break;   // finished off
+                break;   
         }
     }
 
-    // ---- a gun that will not fire with rounds in it (round 5) -- see BotReissueGun, further down ----
-    static std::map<void*, int> BotGunJams;           // bot pawn -> full bursts in a row with rounds in the gun that fired nothing
-    static std::set<void*> BotVerifyNextBurst;        // bot pawns whose next burst is the first after the game's own reload
-    static std::map<void*, float> BotLastReissue;     // bot pawn -> when it last got a fresh copy of its gun
-    static std::map<void*, int> BotReissuesNoFire;    // bot pawn -> fresh copies since its gun last fired
-    static std::set<void*> BotReissueGivenUp;         // bot pawns whose fresh copies did not fire either -- left alone
-    static std::map<void*, float> BotLastShotAt;      // bot pawn -> when its gun last let a round go
-    static int GDryBurstsStillCycling = 0;            // dry bursts not counted: a pump or a bolt-action still between shots
+    static std::map<void*, int> BotGunJams;           
+    static std::set<void*> BotVerifyNextBurst;        
+    static std::map<void*, float> BotLastReissue;     
+    static std::map<void*, int> BotReissuesNoFire;    
+    static std::set<void*> BotReissueGivenUp;         
+    static std::map<void*, float> BotLastShotAt;      
+    static int GDryBurstsStillCycling = 0;            
     static int GGunJamsSeen = 0;
     static int GGunsFireAfterGameReload = 0;
     static int GGunsDeadAfterGameReload = 0;
@@ -10278,7 +9652,6 @@ namespace BotAI
     static bool BotReissueGun(AFortPlayerPawnAthena* Pawn, AFortPlayerControllerAthena* Controller, AFortPlayerStateAthena* PlayerState, int Rounds,
                               const char* Why);
 
-    // Every tick: rounds spent and the ability; once the trigger is back up, the result.
     static void UpdateBurstCheck(AFortPlayerPawnAthena* Pawn, AFortPlayerStateAthena* PlayerState, const std::set<void*>& LivePawns)
     {
         auto It = BotBurstChecks.find((void*)Pawn);
@@ -10307,7 +9680,6 @@ namespace BotAI
                     auto World = UWorld::GetWorld();
                     BotLastShotAt[(void*)Pawn] = World ? (float)UGameplayStatics::GetTimeSeconds(World) : 0.f;
 
-                    // Where those rounds went: with the aim on the target, each one is a hit (BotRoundsFired).
                     BotRoundsFired(Pawn, PlayerState, Check, ThisTick, Weapon, LivePawns);
                 }
 
@@ -10320,15 +9692,13 @@ namespace BotAI
 
         auto FireIt = BotFire.find((void*)Pawn);
         if (FireIt != BotFire.end() && FireIt->second.bFiring)
-            return;   // still going
+            return;   
 
         Check.bOpen = false;
 
         const bool bFired = Check.RoundsSpent > 0;
         const int Mode = Check.Mode;
 
-        // Proof either way only from a burst that had rounds in the gun, kept the same gun, and held the trigger for
-        // at least 4 ticks -- a burst cut short the moment the target ducked out of sight proves nothing.
         const bool bConclusive = Check.RoundsAtStart > 0 && !Check.bWeaponChanged && Check.Ticks >= 4;
 
         GBurstsChecked++;
@@ -10353,8 +9723,6 @@ namespace BotAI
         const bool bTargetStillHere = Check.Target && LivePawns.find(Check.Target) != LivePawns.end();
         const float LifeNow = bTargetStillHere ? PawnLife((AFortPlayerPawnAthena*)Check.Target) : -1.f;
 
-        // Does the game's own shot land? (round 5) A burst that fired, close up, with the bot's aim on its target: what did
-        // the target lose? (The bot code deals nothing while it is still watching, so all of that would be the game's.)
         if (bFired && Check.OnTargetRounds > 0 && Check.TargetKind >= 0 && GBotDamageMode[Check.TargetKind] == BotDamage_Watching &&
             Check.Distance <= 15.f && bTargetStillHere && Check.TargetLifeAtStart > 0.f)
         {
@@ -10414,9 +9782,6 @@ namespace BotAI
         if (!bConclusive)
             return;
 
-        // A gun with rounds in it that will not fire (round 5). In the last log nearly every burst after a bot's first
-        // magazine was this: 30 rounds in, not reloading, not equipping, nothing fired. Two of those in a row -- or one, as
-        // the first burst after the game's own reload -- and the bot gets a fresh copy of its gun (BotReissueGun).
         if (Mode == 1 && GTriggerMode == 1)
         {
             if (bFired)
@@ -10438,8 +9803,6 @@ namespace BotAI
                 auto Gun = (Weapon && ((AFortWeapon*)Weapon)->HasWeaponData()) ? (const UFortItemDefinition*)((AFortWeapon*)Weapon)->WeaponData
                                                                                : nullptr;
 
-                // A pump or a bolt-action is not jammed for being between shots: a dry burst only counts once the gun has had
-                // its own time between shots (its FiringRate) and half a second more since its last round went.
                 const float FireRate = Gun ? BotGunNumbers(Gun).FireRate : 0.f;
                 const float Between = (FireRate > 0.05f) ? 1.f / FireRate : 0.f;
                 auto LastShot = BotLastShotAt.find((void*)Pawn);
@@ -10488,12 +9851,6 @@ namespace BotAI
         }
     }
 
-    // ---- whose finger is on the trigger? -------------------------------------------------------------
-    //
-    // A gun's round counter only goes down when it fires. So every tick: if a bot's gun has fewer rounds than
-    // last tick and the bot code is not in the middle of a burst (and did not just end one), something else
-    // pulled that trigger -- exactly what Grok's old "swing the pickaxe" did with the gun, nonstop. That trigger
-    // is let go on the spot, and it is counted, so the log shows whether anything is still doing it.
     static void WatchBotTrigger(AFortPlayerPawnAthena* Pawn, AFortPlayerStateAthena* PlayerState, int TickNow)
     {
         if (!Pawn || !Pawn->HasCurrentWeapon() || !Pawn->CurrentWeapon)
@@ -10537,35 +9894,16 @@ namespace BotAI
         BotAmmoSeen[(void*)Pawn] = { (void*)Weapon, Rounds };
     }
 
-    // ==== reloading (round 4) ======================================================================================
-    //
-    // "player ais aren't reloading properly". In the last log a bot only ever reloaded in the middle of a fight: the
-    // reload was a countdown kept in the fight's own state, so when the fight ended (the target died) the countdown was
-    // thrown away with it and the bot walked off with an empty gun -- and its next fight began with it standing there for
-    // two seconds "reloading" with nothing to show for it on anyone's screen. 13145 bursts, 40 reloads.
-    //
-    // Now every armed bot on the ground is looked at every tick, fighting or not:
-    //   - an empty gun is reloaded at once, and a gun that is not full is topped off once its fight has been over for a
-    //     second and a half -- the way a player reloads after a fight;
-    //   - the reload is the game's own first (AFortWeapon::Reload: the reload everyone sees, rounds from the bot's ammo),
-    //     pulled the same way as its trigger -- with the bot counted as a "local" player for the length of the call;
-    //   - if the game's reload does not start, or has not refilled the gun a second and a half after the gun's own reload
-    //     time, the bot code waits out that reload time and fills the magazine itself;
-    //   - not one shot while a reload is on; and a "reloading" or "equipping" flag the game leaves stuck on a bot's gun
-    //     long after it should have cleared (either one stops the gun firing) is cleared.
-    // Every reload is logged from start to finish ([RELOAD] lines, and a summary with the others every 10 seconds).
-
-    static int GReloadsByGame = 0;            // reloads the game's own Reload() started
-    static int GReloadsByBotCode = 0;         // ...the bot code had to do itself
-    static int GReloadsRefilledByGame = 0;    // finished with the magazine refilled by the game
-    static int GReloadsRefilledByBotCode = 0; // finished with the bot code filling it
-    static int GReloadsCancelled = 0;         // the bot changed guns or lost it mid-reload
-    static int GReloadsTopOff = 0;            // of all reloads: topping a part-empty gun off after a fight
-    static int GStuckReloadFlags = 0;         // the game's "reloading" flag cleared after being stuck
-    static int GStuckEquipFlags = 0;          // the game's "equipping" flag cleared after being stuck
+    static int GReloadsByGame = 0;            
+    static int GReloadsByBotCode = 0;         
+    static int GReloadsRefilledByGame = 0;    
+    static int GReloadsRefilledByBotCode = 0; 
+    static int GReloadsCancelled = 0;         
+    static int GReloadsTopOff = 0;            
+    static int GStuckReloadFlags = 0;         
+    static int GStuckEquipFlags = 0;          
     static int GReloadLines = 0;
 
-    // A bool on the gun by name (bIsReloadingWeapon / bIsEquippingWeapon on 1.8.2), looked up once.
     struct FGunFlag
     {
         int32 Offset = -2;
@@ -10635,7 +9973,6 @@ namespace BotAI
         return ReadGunFlag(Weapon, GGunEquippingFlag);
     }
 
-    // The gun's own numbers: its magazine (GetBulletsPerClip) and its reload time (GetReloadTime).
     static int GunMagazine(AActor* Weapon, void* PlayerStateKey)
     {
         static UFunction* Fn = nullptr;
@@ -10674,8 +10011,6 @@ namespace BotAI
         if (Fn && Weapon)
             Seconds = Weapon->Call<float>(Fn);
 
-        // GetReloadTime gave nothing usable in the last log (every reload took the 2.0s fallback): the gun's own data table
-        // row says how long it takes (round 5).
         if (!(Seconds >= 0.3f && Seconds <= 8.f) && Weapon && ((AFortWeapon*)Weapon)->HasWeaponData() && ((AFortWeapon*)Weapon)->WeaponData)
             Seconds = BotGunNumbers((const UFortItemDefinition*)((AFortWeapon*)Weapon)->WeaponData).ReloadTime;
 
@@ -10685,8 +10020,6 @@ namespace BotAI
         return Seconds;
     }
 
-    // How long the gun's own reload may take from here (round 5): its reload time -- or, for a gun that loads one round at a
-    // time (a pump: bReloadIndividualBullets), that time for every round missing, so a pump's reload is not cut short.
     static float GunReloadAllowance(AActor* Weapon, int Rounds, int Magazine)
     {
         const float Each = GunReloadTime(Weapon);
@@ -10700,7 +10033,6 @@ namespace BotAI
         return Each;
     }
 
-    // The game's own reload, with the bot counted as a local player for the length of the call (what the trigger needed).
     static bool CallGameReloadRaw(AActor* Weapon, UFunction* Fn, uint8* LocalFlag)
     {
         uint8 Was = 0;
@@ -10776,19 +10108,6 @@ namespace BotAI
         return GunIsReloading(Weapon) == 1;
     }
 
-    // ==== a gun that can fire again (round 5) =======================================================================
-    //
-    // In the last log 21,252 of 22,077 bursts fired nothing, and they were nearly all the same: a gun with a full magazine
-    // (30 of 30), neither "reloading" nor "equipping" -- right after the bot code had refilled it by writing its round
-    // count, because the game's own reload never started (no bot carried a single spare round). A gun fresh out of the
-    // inventory fired every time; a gun refilled behind the game's back never fired again. Those are the bots that "fight
-    // but stop randomly": one magazine, then they stand in front of somebody pulling a dead trigger.
-    //
-    // Now bots carry spare rounds (their loot), so the game's own reload -- the animation everybody sees -- can run. When a
-    // reload finishes, the gun's own "the round count changed" notification runs (OnRep_AmmoCount, with
-    // bUpdateLocalAmmoCount set and the bot counted as a local player: what a player's own game does when the server says
-    // how many rounds there are). And a gun the bot code has to refill itself, or one that still will not fire with rounds
-    // in it, is swapped for a fresh copy out of the bot's inventory with a full magazine (BotReissueGun).
     static int GGunsReissued = 0;
     static int GGunsReissueRefused = 0;
     static int GAmmoSyncs = 0;
@@ -10808,7 +10127,6 @@ namespace BotAI
         return GLocalFlagOffset >= 0 ? (uint8*)Controller + GLocalFlagOffset : nullptr;
     }
 
-    // What the gun itself says it holds for its own player (GetLocalMagazineAmmoCount), -1 if this build cannot say.
     static int GunLocalRounds(AActor* Weapon)
     {
         static UFunction* Fn = nullptr;
@@ -10855,7 +10173,6 @@ namespace BotAI
 
     static bool GAmmoSyncBroken = false;
 
-    // After a reload: the gun's own "round count changed" notification, the way a player's game runs it.
     static void SyncGunAfterRefill(AFortPlayerControllerAthena* Controller, AFortPlayerStateAthena* PlayerState, AActor* Weapon)
     {
         if (!Weapon || GAmmoSyncBroken)
@@ -10905,8 +10222,6 @@ namespace BotAI
         return Item && Item->Object == Object && !(Item->Flags & (0x20000000 | 0x10000000));
     }
 
-    // A fresh copy of the gun in its hands, with `Rounds` in the magazine: the old one out of its inventory (the game puts
-    // the old gun away), the same gun in again with a new item, taken out. The way a gun that always fires comes out.
     static bool BotReissueGun(AFortPlayerPawnAthena* Pawn, AFortPlayerControllerAthena* Controller, AFortPlayerStateAthena* PlayerState, int Rounds,
                               const char* Why)
     {
@@ -10919,7 +10234,6 @@ namespace BotAI
         if (BotReissueGivenUp.find((void*)Pawn) != BotReissueGivenUp.end())
             return false;
 
-        // Not more than once every 3 seconds, and not forever: three fresh copies that do not fire either and it is left be.
         auto Last = BotLastReissue.find((void*)Pawn);
         if (Last != BotLastReissue.end() && Now - Last->second < 3.f)
         {
@@ -10943,7 +10257,7 @@ namespace BotAI
             return false;
 
         auto Inventory = Controller->WorldInventory;
-        FGuid OldGuid = Weapon->HasItemEntryGuid() ? Weapon->ItemEntryGuid : FGuid{};   // not const: FGuid's == takes a plain reference
+        FGuid OldGuid = Weapon->HasItemEntryGuid() ? Weapon->ItemEntryGuid : FGuid{};   
 
         bool bInInventory = false;
         {
@@ -10972,7 +10286,6 @@ namespace BotAI
         const FGuid NewGuid = Item->ItemEntry.ItemGuid;
         auto NewWeapon = (AActor*)Pawn->EquipWeaponDefinition((UFortWeaponItemDefinition*)Def, NewGuid);
 
-        // The old gun, if the game left it lying about: it is not the one in its hands any more.
         if ((AActor*)Weapon != (AActor*)Pawn->CurrentWeapon && ActorIsLive((const UObject*)Weapon))
             ((AActor*)Weapon)->K2_DestroyActor();
 
@@ -11019,15 +10332,14 @@ namespace BotAI
     {
         int32* Ammo = WeaponAmmoCount(Weapon);
         const int RoundsAtEnd = Ammo ? *Ammo : -1;
-        const std::string GunName = BotObjectName((const UObject*)((AFortWeapon*)Weapon)->WeaponData);   // before a fresh copy replaces it
+        const std::string GunName = BotObjectName((const UObject*)((AFortWeapon*)Weapon)->WeaponData);   
 
         const char* How = "";
         int RoundsNow = RoundsAtEnd;
 
         if (bGameRefilled)
         {
-            // The game's own reload did it (round 5): the gun's "round count changed" notification the way a player's game
-            // runs it, and its next burst is watched -- a gun that still will not fire then gets a fresh copy.
+
             SyncGunAfterRefill(Controller, PlayerState, Weapon);
             BotVerifyNextBurst.insert((void*)Pawn);
 
@@ -11035,8 +10347,7 @@ namespace BotAI
         }
         else
         {
-            // The bot code's own reload (round 5): a fresh copy of the gun with a full magazine. Writing the round count -- what
-            // this did before -- is what left the guns unable to fire again in the last log.
+
             WriteGunFlag(Weapon, GGunReloadingFlag, false);
 
             if (BotReissueGun(Pawn, Controller, PlayerState, Reload.Magazine,
@@ -11048,8 +10359,7 @@ namespace BotAI
             }
             else
             {
-                // A fresh copy could not be made just now: the round count, as before (a gun that then will not fire is
-                // caught by its next bursts).
+
                 if (Ammo)
                     *Ammo = Reload.Magazine;
 
@@ -11076,7 +10386,6 @@ namespace BotAI
         Reload.Weapon = nullptr;
     }
 
-    // Every tick, for every armed bot on the ground. bFighting: it is locked onto somebody alive.
     static void TickBotReload(AFortPlayerPawnAthena* Pawn, AFortPlayerStateAthena* PlayerState, AFortPlayerControllerAthena* Controller,
                               bool bFighting, int TickNow)
     {
@@ -11095,7 +10404,6 @@ namespace BotAI
         else if (Reload.NoFightSince < 0.f)
             Reload.NoFightSince = Now;
 
-        // A reload of ours on a gun it no longer holds is over.
         if (Reload.bActive && (void*)Weapon != Reload.Weapon)
         {
             GReloadsCancelled++;
@@ -11116,7 +10424,6 @@ namespace BotAI
         if (!Ammo)
             return;
 
-        // The pickaxe has no magazine.
         if (auto Gun = (AFortWeapon*)Weapon)
             if (Gun->HasWeaponData() && Gun->WeaponData && ((const UObject*)Gun->WeaponData)->IsA<UFortWeaponMeleeItemDefinition>())
                 return;
@@ -11125,7 +10432,6 @@ namespace BotAI
         const int ReloadingFlag = GunIsReloading(Weapon);
         const int EquippingFlag = GunIsEquipping(Weapon);
 
-        // ---- the game's own flags, stuck on long after they should be off (either one keeps the gun from firing) ----
         if (EquippingFlag == 1)
         {
             if (Reload.EquipFlagSince < 0.f)
@@ -11167,11 +10473,10 @@ namespace BotAI
 
                 Reload.ReloadFlagSince = -1.f;
 
-                // A fresh copy (round 5) -- writing the round count is what left guns unable to fire again.
                 if (!BotReissueGun(Pawn, Controller, PlayerState, Magazine, "the game's \"reloading\" flag was stuck on") && *Ammo < Magazine)
                     *Ammo = Magazine;
 
-                return;   // its gun may be a new one now: looked at again next tick
+                return;   
             }
         }
         else
@@ -11179,7 +10484,6 @@ namespace BotAI
             Reload.ReloadFlagSince = -1.f;
         }
 
-        // ---- a reload going on ----
         if (Reload.bActive)
         {
             if (Reload.bGameReload)
@@ -11199,7 +10503,6 @@ namespace BotAI
             return;
         }
 
-        // ---- does it need one? ----
         if (Reload.MagazineOf != (void*)Weapon)
         {
             Reload.MagazineOf = (void*)Weapon;
@@ -11218,7 +10521,7 @@ namespace BotAI
             return;
 
         if (ReloadingFlag == 1)
-            return;   // the game is already at it (and if that sticks, the check above clears it)
+            return;   
 
         LetGoOfTheTrigger(Pawn, TickNow);
 
@@ -11227,7 +10530,7 @@ namespace BotAI
         Reload.RoundsBefore = Rounds;
         Reload.Magazine = Magazine;
         Reload.StartedAt = Now;
-        Reload.Duration = GunReloadAllowance(Weapon, Rounds, Magazine);   // a pump: its reload time for every shell missing
+        Reload.Duration = GunReloadAllowance(Weapon, Rounds, Magazine);   
         Reload.Why = Why;
 
         Reload.bGameReload = StartGameReload(Controller, Weapon);
@@ -11239,7 +10542,7 @@ namespace BotAI
         else
         {
             GReloadsByBotCode++;
-            WriteGunFlag(Weapon, GGunReloadingFlag, true);   // what the gun says while the bot code reloads it
+            WriteGunFlag(Weapon, GGunReloadingFlag, true);   
         }
 
         GReloadsStarted++;
@@ -11266,7 +10569,6 @@ namespace BotAI
                 GReloadsStarted, GReloadsByGame, GReloadsByBotCode, GReloadsTopOff, GReloadsRefilledByGame,
                 GReloadsRefilledByBotCode, GReloadsCancelled, GStuckReloadFlags, GStuckEquipFlags);
 
-        // Round 5: does the gun fire again after a reload?
         LogLine("[RELOAD] After the game's own reload: %d gun(s) fired their next burst, %d did not | OnRep_AmmoCount run after a reload %d "
                 "time(s) | full bursts with rounds in the gun that fired nothing %d (not counted: %d from a pump or bolt-action still "
                 "between shots) | fresh copies of a gun %d (%d held back: one every 3 seconds at most) | bots left be after 3 fresh "
@@ -11275,19 +10577,9 @@ namespace BotAI
                 GGunsReissueRefused, BotReissueGivenUp.size());
     }
 
-    // ---- keeping the gun pointed where the bot code aims it -------------------------------------------
-    //
-    // The bot code runs once a frame, at the very end of it. Earlier in every frame the engine turns each AI
-    // controller towards its "focus" -- or, with none, towards wherever it is walking -- and the gun's automatic
-    // shots go out after that. So the aim the bot code set only ever steered the first bullet of a burst; the
-    // rest went wherever the engine had it pointed (very often the spot it was walking to). Handing the engine
-    // the focus makes it hold the aim for the whole burst:
-    //   aim on target -> focus on the target itself (the engine tracks them, up and down included)
-    //   aim off       -> focus on a point out along the off aim, so that burst really does miss
     static bool GFocusFaulted = false;
     static bool GAimReadFaulted = false;
 
-    // 0 = clear it, 1 = focus on an actor, 2 = focus on a point.
     static void BotFocusRaw(::AAIController* AIController, int Mode, AActor* Focus, const FVector* Point)
     {
         if (Mode == 1)
@@ -11306,8 +10598,6 @@ namespace BotAI
         }
     }
 
-    // The engine calls on their own, inside their own fault guard: if this build ever faults in them, the focus is
-    // switched off for the rest of the match (logged) instead of a fault throwing away every bot tick from then on.
     static void BotFocusGuarded(::AAIController* AIController, int Mode, AActor* Focus, const FVector* Point)
     {
         __try
@@ -11340,13 +10630,11 @@ namespace BotAI
         }
     }
 
-    // Standing its ground: drop whatever walk it was on (same fault guard as above).
     static bool GStopFaulted = false;
 
     static void BotStopWalkingRaw(::AAIController* AIController)
     {
-        // A player-controller bot's walk is the one TickBotBodies is walking (see BotMoveTo): dropping it is all
-        // standing still takes.
+
         if (IsPlayerControllerBot((AActor*)AIController))
         {
             auto Pawn = ((AFortPlayerControllerAthena*)AIController)->Pawn;
@@ -11361,10 +10649,6 @@ namespace BotAI
         AIController->StopMovement();
     }
 
-    // "Walk there". MoveToLocation is an AI-controller function; on a player-controller bot (every bot on 1.8.2) it
-    // is looked up, not found, and does nothing -- the reason no bot ever took a step (the movement report's "moved
-    // 0 units"). For those bots the walk is kept here instead and walked by TickBotBodies, with the same answer
-    // MoveToLocation gives for a request it took (2).
     static uint8 BotMoveTo(::AAIController* AIController, AFortPlayerPawnAthena* Pawn, FVector Goal, float AcceptRadius)
     {
         if (IsPlayerControllerBot((AActor*)AIController))
@@ -11456,13 +10740,6 @@ namespace BotAI
             BotFocusGuarded(AIController, 0, nullptr, nullptr);
     }
 
-    // ---- is the ground in the way? -----------------------------------------------------------------------
-    //
-    // The game's line-of-sight check is one opinion. This is a second one, just for the ground: a straight line
-    // from the bot's eyes to the target's chest, on the camera channel (the one that keeps the camera out of
-    // hills) and on the visibility channel. If either runs into the landscape, there is no shot, whatever the
-    // other check said.
-
     class BKismetSystemLibrary : public UObject
     {
     public:
@@ -11507,8 +10784,6 @@ namespace BotAI
         UObject* Context = (UObject*)Self;
         TArray<AActor*> Ignore{};
 
-        // One more actor for the line to go straight through (a bot's own gun). The engine only reads this list during
-        // the call, so it can live right here on the stack.
         AActor* IgnoreList[1] = { AlsoIgnore };
 
         if (AlsoIgnore)
@@ -11519,7 +10794,7 @@ namespace BotAI
         }
 
         bool bComplex = false;
-        uint8 DrawDebug = 0;        // EDrawDebugTrace::None
+        uint8 DrawDebug = 0;        
         void* HitOut = (void*)HitBuffer;
         bool bIgnoreSelf = true;
         FColour TraceColour{ 1.f, 0.f, 0.f, 1.f };
@@ -11530,8 +10805,6 @@ namespace BotAI
                                                      HitOut, bIgnoreSelf, TraceColour, HitColour, DrawTime);
     }
 
-    // The engine call on its own, inside its own fault guard: if this build ever faults in it, line traces are
-    // switched off for the rest of the match (logged) instead of a fault throwing away every bot tick from then on.
     static bool BotTraceGuarded(AActor* Self, const FVector* Start, const FVector* End, uint8 Channel, uint8* HitBuffer,
                                 AActor* AlsoIgnore = nullptr)
     {
@@ -11599,18 +10872,13 @@ namespace BotAI
         return std::string(Name.c_str());
     }
 
-    // Can this bot see them? A straight line from its eyes to their chest, then to their head (someone with their head
-    // over a wall can be shot at). The line goes straight through the bot's own gun. It sees them if the first thing
-    // the line runs into is them, the gun in their hands (an actor their pawn owns), or nothing at all. Anything else
-    // -- a wall, a floor, a tree, the ground, a build (builds belong to the CONTROLLER that built them, so a wall
-    // they built, or the bot built, is in the way like any other) -- and WhatIsInTheWay says what it was.
     static bool BotStraightLineSees(AFortPlayerPawnAthena* Me, AActor* Them, std::string* WhatIsInTheWay)
     {
         if (!Me || !Them)
             return false;
 
         if (!BotTraceAvailable())
-            return true;   // nothing to look with on this build: the cone in front of it decides alone
+            return true;   
 
         const FVector MyLoc = Me->K2_GetActorLocation();
         const FVector ThemLoc = Them->K2_GetActorLocation();
@@ -11626,21 +10894,21 @@ namespace BotAI
         {
             FVector Point(ThemLoc.X, ThemLoc.Y, ThemLoc.Z + Heights[h]);
 
-            const FBotHit Hit = BotTrace((AActor*)Me, Eyes, Point, 0, MyGun);   // the visibility channel
+            const FBotHit Hit = BotTrace((AActor*)Me, Eyes, Point, 0, MyGun);   
 
             if (GTraceFaulted)
                 return true;
 
             if (!Hit.bHit)
-                return true;                       // nothing at all between its eyes and them
+                return true;                       
 
             if (Hit.Actor)
             {
                 if (Hit.Actor == Them)
-                    return true;                   // the first thing it runs into is them
+                    return true;                   
 
                 if ((AActor*)Hit.Actor->Owner == Them)
-                    return true;                   // the gun in their hands (owned by their pawn, unlike a build)
+                    return true;                   
             }
 
             if (FirstInTheWay.empty())
@@ -11666,7 +10934,6 @@ namespace BotAI
         FVector Chest = ThemLoc;
         Chest.Z = ThemLoc.Z + 30.0;
 
-        // TraceTypeQuery2 (camera) first, then TraceTypeQuery1 (visibility).
         const uint8 Channels[2] = { 1, 0 };
 
         for (int c = 0; c < 2; c++)
@@ -11690,34 +10957,14 @@ namespace BotAI
         return false;
     }
 
-    static std::map<void*, std::pair<int, bool>> BotGroundCheck;   // bot pawn -> (tick it was checked, ground in the way)
+    static std::map<void*, std::pair<int, bool>> BotGroundCheck;   
 
     static float TimeAccum = 0.f;
     static float LastFillTime = 0.f;
     static bool bMovedToIsland = false;
     static float BusStartedTime = 0.f;
 
-    // =========================================================================================================
-    // BOT BODIES -- moving player-controller bots (every bot on 1.8.2)
-    //
-    // A bot here is a real Athena_PlayerController with no connection behind it, and this server runs as a
-    // dedicated server (GetNetMode answers NM_DedicatedServer). A player controller without a local player is
-    // never "locally controlled" on a dedicated server, so the engine never moves its pawn on its own: no gravity,
-    // no walking. A remote player's pawn only ever moves when that player's game sends a ServerMove. That is why
-    // every bot hung in the sky at Z=15500 after the bus ("touched down at Z=15500"), and why MoveToLocation (an
-    // AI-controller function) did nothing at all.
-    //
-    // So each bot's move is sent for it, every tick, exactly as a real player's game sends it: a time stamp, where
-    // it wants to go (acceleration) and where it is looking. The engine's own character movement then runs it --
-    // gravity, the skydive, the glider, walking, slopes, steps, the hops the bot code asks for -- the same code that
-    // moves the real player.
-    //
-    // The first bots down from the bus check that this really happens on this build: a bot in the air under real
-    // movement has to come down. If they do not, every bot switches to scripted movement instead -- put a step
-    // further along each tick, with a line trace keeping its feet on the ground. The [BODY] lines say which.
-    // =========================================================================================================
-
-    static int GBodyVerdict = 0;            // 0 = still checking, 1 = real movement moves bots, 2 = scripted for everyone
+    static int GBodyVerdict = 0;            
     static int GBodyChecks = 0;
     static int GBodyChecksFell = 0;
     static int GBodyScriptedOnTheirOwn = 0;
@@ -11729,9 +10976,6 @@ namespace BotAI
     static bool GServerMoveResolved = false;
     static uint32 GSM_TimeStamp = 0, GSM_InAccel = 0, GSM_ClientLoc = 0, GSM_Flags = 0, GSM_Roll = 0, GSM_View = 0, GSM_Mode = 0, GSM_Size = 0;
 
-    // ServerMoveNoBase(TimeStamp, InAccel, ClientLoc, CompressedMoveFlags, ClientRoll, View, ClientMovementMode):
-    // ServerMove without the movement-base arguments, which the engine fills with "no base" itself. Every
-    // argument is found by name and checked for size before a single move is sent.
     static bool ResolveServerMove(AFortPlayerPawnAthena* Pawn)
     {
         if (GServerMoveResolved)
@@ -11797,7 +11041,6 @@ namespace BotAI
         }
     }
 
-    // FRotator::CompressAxisToShort
     static uint16 CompressAxis(double Angle)
     {
         double A = fmod(Angle, 360.0);
@@ -11856,8 +11099,6 @@ namespace BotAI
 
     static int32 GHitPointOffset = -2;
 
-    // The ground under (X, Y), looked for from FromZ down to ToZ -- the same engine line trace (and fault guard) the
-    // bots' eyes use.
     static bool BotGroundBelow(AFortPlayerPawnAthena* Pawn, double X, double Y, double FromZ, double ToZ, double& OutZ)
     {
         if (!Pawn || !BotTraceAvailable())
@@ -11895,11 +11136,9 @@ namespace BotAI
         return true;
     }
 
-    // One real move for one bot: the same ServerMove a player's game sends, so the engine's character movement runs it.
     static void BodyRealStep(AFortPlayerControllerAthena* Controller, AFortPlayerPawnAthena* Pawn, FBotBody& Body, const FVector& Loc, float Dt)
     {
-        // The engine only takes moves for the pawn the player has acknowledged. A real client acknowledges its pawn
-        // with ServerAcknowledgePossession; a bot has no client to do that.
+
         if (Controller->AcknowledgedPawn != (AActor*)Pawn)
             Controller->AcknowledgedPawn = (AActor*)Pawn;
 
@@ -11923,11 +11162,9 @@ namespace BotAI
             }
         }
 
-        // where it is looking: whatever the bot code last set (its aim, or the way it is walking)
         const FRotator Aim = Controller->GetControlRotation();
         const uint32 View = ((uint32)CompressAxis(Aim.Yaw) << 16) | (uint32)CompressAxis(Aim.Pitch);
 
-        // The engine takes at most an eighth of a second per move.
         Body.Clock += (Dt > 0.125f) ? 0.125f : Dt;
 
         uint8 Mode = 0;
@@ -11944,8 +11181,6 @@ namespace BotAI
         Accel[1] = (float)AY;
         Accel[2] = 0.f;
 
-        // (1, 2, 3) is how the engine marks the first half of a dual move: the "where does the client think it is"
-        // check is skipped. A bot has no client that could disagree with the server.
         float* ClientLoc = (float*)(Params + GSM_ClientLoc);
         ClientLoc[0] = 1.f;
         ClientLoc[1] = 2.f;
@@ -11966,7 +11201,6 @@ namespace BotAI
         GBodyMovesSent++;
     }
 
-    // One scripted step: down from the sky, or a step along the ground, placed by hand.
     static void BodyScriptedStep(AFortPlayerPawnAthena* Pawn, FBotBody& Body, const FVector& Loc, float Dt, bool bAirborne)
     {
         auto Move = (Pawn->HasCharacterMovement() && Pawn->CharacterMovement) ? Pawn->CharacterMovement : nullptr;
@@ -11981,8 +11215,6 @@ namespace BotAI
             }
         };
 
-        // Not yet known to be standing on anything: is there ground right under its feet? (Something can call a bot
-        // "down" while it is still in the air -- TickLandings does after a second and a half without it dropping.)
         bool bFalling = bAirborne;
 
         if (!bAirborne && !Body.bOnGround)
@@ -12006,7 +11238,7 @@ namespace BotAI
             Body.bOnGround = false;
 
             const bool bGlider = Pawn->HasbIsParachuteOpen() && Pawn->bIsParachuteOpen;
-            const double Down = bGlider ? 700.0 : 2400.0;   // units a second: under the glider / free fall
+            const double Down = bGlider ? 700.0 : 2400.0;   
 
             if (!Body.bGroundKnown || fabs(Body.GroundFor.X - Loc.X) > 300.0 || fabs(Body.GroundFor.Y - Loc.Y) > 300.0)
             {
@@ -12031,7 +11263,6 @@ namespace BotAI
 
             SetVelocity(0.0, 0.0, bOnTheGround ? 0.0 : -Down);
 
-            // On its feet: walking -- the game then settles it on the floor itself, and TickLandings sees it is down.
             if (bOnTheGround)
             {
                 Body.bOnGround = true;
@@ -12068,9 +11299,6 @@ namespace BotAI
         const double NX = Loc.X + DX / Dist * Step;
         const double NY = Loc.Y + DY / Dist * Step;
 
-        // The ground at the next step, looked for from a step's height above its feet. Nothing there, a rise too high
-        // to step up, or a drop too far to walk down: it stays where it is (the bot code's own stuck checks then send
-        // it another way).
         const double Feet = (double)Loc.Z - Half;
         double Ground = 0.0;
 
@@ -12127,13 +11355,11 @@ namespace BotAI
             if (!Pawn || Pawn->GetHealth() <= 0.f)
                 continue;
 
-            // Only bots that are off the bus (in the air or on the island). The warmup island is left as it was.
             if (MovedToIsland.find((void*)Pawn) == MovedToIsland.end())
                 continue;
 
             auto& Body = BotBodies[(void*)Pawn];
 
-            // A pawn at an address an earlier bot's pawn had: its time stamps, checks and goal are not this one's.
             if (Body.Owner != (void*)Controller)
             {
                 if (Body.Owner)
@@ -12154,13 +11380,12 @@ namespace BotAI
                 continue;
             }
 
-            // Under its glider: no faster down than the game's own glider (round 5).
             if (bAirborne)
                 HoldBotGlideDescent(Pawn);
 
             BodyRealStep(Controller, Pawn, Body, Loc, Dt);
 
-            if (GBodyVerdict == 2)      // sending its move faulted: moved by script from the next tick on
+            if (GBodyVerdict == 2)      
             {
                 OnScript++;
                 continue;
@@ -12168,11 +11393,6 @@ namespace BotAI
 
             OnReal++;
 
-            // The check that real movement really moves bots on this build, once for each bot: high up under it, a bot
-            // has to come down. One second is enough -- gravity alone takes a bot about 490 units down in its first
-            // second, and a skydive or a glider comes down a good few hundred units a second -- and it is over before
-            // TickLandings, which calls a bot "down" after a second and a half without dropping, stops treating it as
-            // in the air. (A bot that is not high up at all, or no longer is, has nothing to show: it is not checked.)
             if (Body.bChecked)
                 continue;
 
@@ -12194,8 +11414,6 @@ namespace BotAI
                 continue;
             }
 
-            // Measured from the highest it has been while watched, so a little hop up as it leaves the bus is not
-            // counted against it.
             if ((float)Loc.Z > Body.WatchZ)
                 Body.WatchZ = (float)Loc.Z;
 
@@ -12207,7 +11425,6 @@ namespace BotAI
             const float Fell = Body.WatchZ - (float)Loc.Z;
             const bool bFell = Fell >= 150.f;
 
-            // The first few that do come down are reported too, so the log shows the check passing, not only failing.
             static int GoodReports = 0;
             if (bFell && ++GoodReports <= 3)
                 LogLine("[BODY] '%s' came down %.0f units in 1s under real movement -- the game's own movement moves it.",
@@ -12254,12 +11471,6 @@ namespace BotAI
         }
     }
 
-    // ---- a gun in its hands -----------------------------------------------------------------------------------
-    //
-    // A bot that is down from the bus with nothing in its hands takes its gun out. SpawnBots puts the bot's loot in its
-    // inventory but never in its hands, and the pawn a bot gets off the bus with is a new one anyway -- so every bot
-    // landed empty-handed and the combat code could only count "tried to fire holding nothing". It takes out the best gun
-    // it carries (BotGunScore); these are only for a bot that has none at all (the old fixed kit's guns, best first).
     static const wchar_t* GBotKitGuns[] = {
         L"WID_Assault_AutoHigh_Athena_SR_Ore_T03",
         L"WID_Shotgun_Standard_Athena_C_Ore_T03",
@@ -12292,7 +11503,7 @@ namespace BotAI
 
             if (BotIsHoldingAWeapon(Pawn))
             {
-                // remembered, so the combat code can hand it back if it is ever lost
+                
                 if (BotWeapons.find((void*)PlayerState) == BotWeapons.end())
                 {
                     auto Weapon = (AFortWeapon*)Pawn->CurrentWeapon;
@@ -12322,8 +11533,6 @@ namespace BotAI
             const UFortItemDefinition* Gun = nullptr;
             FGuid GunGuid{};
 
-            // The best gun it carries for a fight (BotGunScore: rifle, SMG, shotgun, pistol, sniper, launcher, then rarity)
-            // -- its loot comes from the game's own loot tables now, so it is not the same gun for everybody.
             {
                 int BestScore = -1;
                 auto& Entries = Inventory->Inventory.ReplicatedEntries;
@@ -12344,7 +11553,6 @@ namespace BotAI
 
             bool bGaveIt = false;
 
-            // Nothing in its pockets (the bus may have emptied them): its first kit gun.
             if (!Gun)
             {
                 auto Def = FindItemDefByName(GBotKitGuns[0]);
@@ -12400,8 +11608,6 @@ namespace BotAI
         static int reportCounter_forDir = 0;
         static std::map<void*, int> BotWanderDirTick;
 
-        // Everybody still alive this tick. A bot locked onto a target keeps it until the target is no
-        // longer in here (it died, or left the match).
         std::set<void*> LivePawns;
 
         for (int i = 0; i < GameState->PlayerArray.Num(); i++)
@@ -12482,7 +11688,6 @@ namespace BotAI
 
             auto AIController = (::AAIController*)Controller;
 
-            // Epic's own senses and target picker off, once per bot (see SilenceNativeSenses).
             SilenceNativeSenses(AIController);
 
             const bool bHasNativeBrain = AIController->HasBrainComponent() && AIController->BrainComponent;
@@ -12532,18 +11737,10 @@ namespace BotAI
             auto combatIt = BotCombatTarget.find(Pawn);
             AFortPlayerPawnAthena* Target = (combatIt != BotCombatTarget.end()) ? combatIt->second : nullptr;
 
-            // Before the bus leaves there is no target, no aim and no trigger. A bot that was
-            // somehow already firing gets the trigger put back up here, so nothing can carry over
-            // into the pre-match lobby.
-            // Bus gone, protection off (BotCombatIsOpen) AND this particular bot is on the ground.
-            // A bot still under its glider, or not yet dropped, never targets or fires.
-            // Absolute: no targeting, aiming, or firing until bus left AND this bot has landed.
             const bool bCombatOpen = BotCombatIsOpen() && BotHasLanded((void*)Pawn);
 
-            // Did its gun go off since last tick without the bot code pulling the trigger? (let go + counted)
             WatchBotTrigger(Pawn, PlayerState, reportCounter_forDir);
 
-            // How its last burst really went (the [FIRE] lines), once the trigger is back up.
             UpdateBurstCheck(Pawn, PlayerState, LivePawns);
 
             if (!bCombatOpen)
@@ -12574,21 +11771,14 @@ namespace BotAI
                     FireIt->second.CooldownTicksLeft = 0;
                 }
 
-                // Skip the entire combat block for this bot this tick.
                 continue;
             }
 
-            // On the ground and allowed to fight: the server runs its abilities -- its gun's -- itself (see
-            // LetTheServerRunBotAbilities). Every tick, because the game puts the player controller back on a new pawn.
             if (IsPlayerControllerBot((AActor*)Controller))
                 LetTheServerRunBotAbilities(Controller, PlayerState);
 
-            // Reloads, fighting or not: an empty gun at once, a part-empty one after the fight (TickBotReload).
             TickBotReload(Pawn, PlayerState, Controller, Target && LivePawns.find((void*)Target) != LivePawns.end(), reportCounter_forDir);
 
-            // Locked on: once a bot has a target it fights that ONE target until it dies (or the bot
-            // does). No rescanning for somebody closer, no switching, and not dropped for going out of
-            // sight or out of range -- it gets chased instead (and only shot at when it can be seen).
             if (Target && LivePawns.find((void*)Target) == LivePawns.end())
             {
                 GLocksEnded++;
@@ -12647,9 +11837,6 @@ namespace BotAI
                     const double ody = OLoc.Y - MyLoc.Y;
                     const double Distance = sqrt(odx * odx + ody * ody);
 
-                    // Range caps (1 metre = 100 Unreal units):
-                    //   humans and bots alike: BotShootRealPlayerRange (config, 50 m) -- no sniping each other
-                    //   from 200 m away
                     const double kBotOnBotMaxRange = (FConfiguration::BotShootRealPlayerRange > 0.f)
                         ? (double)FConfiguration::BotShootRealPlayerRange : 5000.0;
                     double MaxRange = bIsHuman
@@ -12661,14 +11848,9 @@ namespace BotAI
                     if (Distance > MaxRange)
                         continue;
 
-                    // And it has to be able to actually see them -- line of sight, in front of the bot.
-                    // For a real player this is strict (the "ONLY WHEN IM VISIBLE" rule): current line
-                    // of sight, no memory grace.
                     if (!BotCanSee(AIController, Pawn, MyLoc, OtherPawn, (AActor*)OtherPawn, reportCounter_forDir, bIsHuman))
                         continue;
 
-                    // ...and the ground must not be in the way either (a second opinion, see BotGroundInTheWay):
-                    // nobody gets locked onto through a hill.
                     if (BotGroundInTheWay(Pawn, MyLoc, OtherPawn, OLoc))
                         continue;
 
@@ -12681,8 +11863,6 @@ namespace BotAI
                     }
                 }
 
-                // If nobody in normal range, but a human recently shot this bot, aggro that human
-                // from any distance (will use long-range accuracy later).
                 if (!Best)
                 {
                     auto Agg = AggroedByHuman.find((void*)Controller);
@@ -12732,8 +11912,6 @@ namespace BotAI
             bool bInCombat = false;
             bool bLongRangeAggro = false;
 
-            // Bot-on-bot capped at the same range as real players (BotShootRealPlayerRange, 50 m);
-            // humans use the configured engage range (they are held to BotShootRealPlayerRange below).
             double EngageRange = (FConfiguration::BotEngageRange > 0.f) ? (double)FConfiguration::BotEngageRange : 12000.0;
             if (Target)
             {
@@ -12741,15 +11919,12 @@ namespace BotAI
                     if (auto TgtState = (AFortPlayerStateAthena*)TgtController->PlayerState)
                         if (TgtState->HasbIsABot() && TgtState->bIsABot)
                             EngageRange = (FConfiguration::BotShootRealPlayerRange > 0.f)
-                                ? (double)FConfiguration::BotShootRealPlayerRange : 5000.0; // 50 metres bot-on-bot
+                                ? (double)FConfiguration::BotShootRealPlayerRange : 5000.0; 
             }
             const double PreferredRange = 1400.0;
 
             const bool bMayFight = FConfiguration::bBotCombatEnabled && bCombatOpen;
 
-            // Is the current target a real player? Real players are held to the strict rules: current
-            // line of sight only, and dropped the moment they are more than 50 metres away -- unless
-            // they recently shot this bot (long-range aggro).
             bool bTargetIsHuman = false;
             if (Target)
             {
@@ -12767,7 +11942,6 @@ namespace BotAI
                 const double Dist = sqrt(hx * hx + hy * hy);
                 bHumanTooFar = Dist > (double)FConfiguration::BotShootRealPlayerRange;
 
-                // Still within aggro window from being shot? Allow long-range return fire.
                 if (bHumanTooFar)
                 {
                     auto Agg = AggroedByHuman.find((void*)Controller);
@@ -12788,9 +11962,6 @@ namespace BotAI
                 }
             }
 
-            // A target that goes out of sight or out of range is no longer dropped: the bot is locked on
-            // and keeps after it. Sight and range now decide only whether it may SHOOT (bCanShoot below).
-
             if (bMayFight && Target && Target->GetHealth() > 0.0f)
             {
                 FVector TLoc = Target->K2_GetActorLocation();
@@ -12800,7 +11971,6 @@ namespace BotAI
                 const double tdz = TLoc.Z - MyLoc.Z;
                 const double Flat = sqrt(tdx * tdx + tdy * tdy);
 
-                // Allow long-range return fire (after being shot) even beyond normal engage range.
                 const double EffectiveEngage = bLongRangeAggro
                     ? ((FConfiguration::BotHuntPlayerRange > 0.f) ? (double)FConfiguration::BotHuntPlayerRange : 50000.0)
                     : EngageRange;
@@ -12808,10 +11978,6 @@ namespace BotAI
                 {
                     bInCombat = true;
 
-                    // It shoots ONLY when it can actually see them -- a clear line as the game itself checks it
-                    // (walls and floors block it) AND no ground in the way (a second check, so nobody gets shot
-                    // at through a hill) -- and they are within its shooting range. Otherwise it holds its fire
-                    // and goes to find them.
                     const bool bInShootRange = !bHumanTooFar && Flat < EffectiveEngage;
                     const bool bGameSaysVisible = BotHasLineOfSight(AIController, (AActor*)Target);
 
@@ -12847,7 +12013,7 @@ namespace BotAI
                     }
                     else if (bInShootRange)
                     {
-                        // What does the game's check count as in the way? A few samples, for the log.
+                        
                         static int BlockedSamples = 0;
 
                         if (BlockedSamples < 6 && BotTraceAvailable())
@@ -12879,9 +12045,6 @@ namespace BotAI
                     const double Yaw = atan2(tdy, tdx) * (180.0 / 3.14159265358979323846);
                     const double Pitch = atan2(tdz, Flat > 1.0 ? Flat : 1.0) * (180.0 / 3.14159265358979323846);
 
-                    // ---- Did the burst really go where it was aimed? (the [AIM] log line) ----
-                    // Read before anything is changed this tick: whatever the game left the aim at is what the
-                    // gun's automatic shots went out along since the last tick.
                     {
                         auto Was = BotIntendedAim.find((void*)Pawn);
                         auto FireNow = BotFire.find((void*)Pawn);
@@ -12899,9 +12062,6 @@ namespace BotAI
 
                                 GAimChecks++;
 
-                                // Held = within 2 degrees (a target running across in one frame moves about that
-                                // much). Anything the engine turned it to instead -- the walk, the body, Epic's own
-                                // target picker -- is off by more.
                                 if (Off <= 2.0)
                                     GAimHeld++;
 
@@ -12915,14 +12075,9 @@ namespace BotAI
 
                     if (bTargetVisible)
                     {
-                        // ---- Aim error (the anti-aimbot) ----
-                        // Pointing exactly at the target every tick is what made these things lethal. We
-                        // hold a per-bot angular offset and only re-roll it every ~12 ticks (~0.4s), so a
-                        // burst lands consistently off-target instead of wobbling around the true aim and
-                        // averaging back into a hit. Tune FConfiguration::BotAimErrorDegrees.
+
                         double ErrYaw = 0.0, ErrPitch = 0.0;
 
-                        // Use larger aim error when returning fire from long range after being shot.
                         const float AimDeg = bLongRangeAggro
                             ? FConfiguration::BotLongRangeAimErrorDegrees
                             : FConfiguration::BotAimErrorDegrees;
@@ -12940,9 +12095,6 @@ namespace BotAI
                                 ErrYaw   = (((double)(rand() % 2001) / 1000.0) - 1.0) * Max;
                                 ErrPitch = (((double)(rand() % 2001) / 1000.0) - 1.0) * PitchMax;
 
-                                // About 30% fewer hits (FConfiguration::BotAimMissChance): this share of
-                                // aims is a clean miss -- off to one side by more than half the target's
-                                // width at this distance, so the burst cannot land.
                                 if (FConfiguration::BotAimMissChance > 0.f &&
                                     (double)(rand() % 10000) < (double)FConfiguration::BotAimMissChance * 10000.0)
                                 {
@@ -12967,14 +12119,11 @@ namespace BotAI
                             }
                         }
 
-                        // Will this aim land? (a player is about 90 wide and 170 tall)
                         const double AimDist = sqrt(Flat * Flat + tdz * tdz);
                         const double HalfWide = atan2(45.0, AimDist > 1.0 ? AimDist : 1.0) * (180.0 / 3.14159265358979323846);
                         const double HalfTall = atan2(85.0, AimDist > 1.0 ? AimDist : 1.0) * (180.0 / 3.14159265358979323846);
                         const bool bOnTarget = fabs(ErrYaw) <= HalfWide && fabs(ErrPitch) <= HalfTall;
 
-                        // An aim that misses only up or down becomes one that misses to the side: aiming at a point,
-                        // the engine levels the aim out, and a levelled-out miss could land.
                         if (!bOnTarget && fabs(ErrYaw) <= HalfWide)
                             ErrYaw = (ErrYaw < 0.0 ? -1.0 : 1.0) * (HalfWide + 1.0);
 
@@ -12986,7 +12135,6 @@ namespace BotAI
 
                         AIController->SetControlRotation(Aim);
 
-                        // A player-controller bot's camera on its eyes, pointed where it aims (the gun may ask it).
                         if (IsPlayerControllerBot((AActor*)Controller))
                             KeepBotCameraOnItsEyes(Controller, Pawn, Aim);
 
@@ -12997,7 +12145,6 @@ namespace BotAI
                         Face.Roll = FaceRoll;
                         Pawn->K2_SetActorRotation(Face, false);
 
-                        // ...and have the engine hold that aim for the whole burst, not just the first bullet.
                         BotAimAt(AIController, bOnTarget ? Target : nullptr, MyLoc, AimYaw, AimPitch, AimDist);
 
                         FBotAimRecord AimRecord{};
@@ -13005,7 +12152,6 @@ namespace BotAI
                         AimRecord.Pitch = AimPitch;
                         BotIntendedAim[(void*)Pawn] = AimRecord;
 
-                        // Where the rounds its gun lets go of before its next tick go (BotRoundsFired, round 5).
                         FBotShotAim& ShotAim = BotShotAim[(void*)Pawn];
                         ShotAim.Target = (void*)Target;
                         ShotAim.bOnTarget = bOnTarget;
@@ -13014,16 +12160,12 @@ namespace BotAI
                     }
                     else
                     {
-                        // Cannot see them: no standing there aiming at them through whatever is in the way -- it
-                        // looks where it is going while it goes to find them.
+
                         BotStopAiming(AIController);
                         BotIntendedAim.erase((void*)Pawn);
                         BotShotAim.erase((void*)Pawn);
                     }
 
-                    // Closes in when they are further off than it likes to fight from, and whenever it cannot see
-                    // them -- first to the spot it last saw them at (so it does not walk at them straight through
-                    // a hill), then after them.
                     if (Flat > PreferredRange || !bTargetVisible)
                     {
                         BotStoppedForFight.erase((void*)Pawn);
@@ -13042,7 +12184,7 @@ namespace BotAI
                                 if ((SpotX * SpotX + SpotY * SpotY) > (500.0 * 500.0))
                                     Goal = Spot->second;
                                 else
-                                    BotLastSeenSpot.erase(Spot);   // got there and still cannot see them: after them
+                                    BotLastSeenSpot.erase(Spot);   
                             }
                         }
 
@@ -13055,13 +12197,9 @@ namespace BotAI
                         {
                             BotCombatTick[Pawn] = reportCounter_forDir;
 
-                            // Straight there -- no recorded route ("navmesh") any more.
                             BotMoveTo(AIController, Pawn, Goal, 400.f);
                         }
 
-                        // Locked on, it keeps after a target that is out of sight too, so it can walk into a wall
-                        // on the way: a second without getting anywhere means a hop towards where it is going
-                        // (the same unstick the wandering uses).
                         static std::map<void*, FVector> ChaseOrigin;
                         static std::map<void*, int> ChaseCheckTick;
 
@@ -13100,8 +12238,7 @@ namespace BotAI
                     }
                     else if (!GStopFaulted && BotStoppedForFight.insert((void*)Pawn).second)
                     {
-                        // In range and in sight: it stands and fights, instead of carrying on to wherever it
-                        // happened to be walking when it spotted them.
+
                         BotStopWalkingGuarded(AIController);
                     }
 
@@ -13109,8 +12246,7 @@ namespace BotAI
 
                     if (!bCanShoot)
                     {
-                        // Never a shot at somebody it cannot see (or who is out of its range): trigger up,
-                        // and it gets a fresh moment to react once it can see them again.
+
                         if (Fire.bFiring)
                         {
                             BotTrigger(Pawn, false);
@@ -13134,8 +12270,7 @@ namespace BotAI
 
                     if (BotIsReloading(Pawn))
                     {
-                        // Reloading (TickBotReload, earlier this tick): trigger up and no new burst until the gun is full
-                        // again -- and a moment to bring it back up once it is.
+
                         if (Fire.bFiring)
                         {
                             BotTrigger(Pawn, false);
@@ -13151,7 +12286,7 @@ namespace BotAI
                     }
                     else if (!bCanShoot)
                     {
-                        // Out of sight or out of range: closing in, holding fire.
+                        
                     }
                     else if (Fire.ReactionTicksLeft > 0)
                     {
@@ -13185,7 +12320,6 @@ namespace BotAI
 
                             GCombatBurstsFired++;
 
-                            // Watched until the trigger is back up: did the gun really lose rounds (UpdateBurstCheck)?
                             StartBurstCheck(Pawn, Controller, Target, (float)(Flat / 100.0));
 
                             if (auto TargetController = (AActor*)Target->Controller)
@@ -13258,7 +12392,6 @@ namespace BotAI
                     BotFire.erase(FireIt);
                 }
 
-                // Nobody to fight: no aim focus, no fighting stance, nothing remembered.
                 BotStopAiming(AIController);
                 BotIntendedAim.erase((void*)Pawn);
                 BotShotAim.erase((void*)Pawn);
@@ -13296,14 +12429,6 @@ namespace BotAI
                     BotLastZoneDistance[Pawn] = (float)Length;
                 }
 
-                // Every bot used to aim at the same coordinate -- straight at the middle of the
-                // circle, pulled back along its own approach line. Bots that started anywhere near
-                // each other therefore asked the route graph for the same journey and got the same
-                // answer, which is why a hundred of them walked one behind the other in a line.
-                //
-                // Each bot now owns a spot inside the circle, picked once from its own number and
-                // kept for the whole match, so a hundred bots have a hundred destinations and walk
-                // a hundred different ways.
                 FVector Goal = ZoneCentre;
 
                 float Fraction = FConfiguration::BotZoneEntryFraction;
@@ -13315,8 +12440,6 @@ namespace BotAI
 
                     const double Angle = ((double)(Seed % 3600) / 10.0) * 3.14159265358979323846 / 180.0;
 
-                    // Somewhere between a third and most of the way out, so they fill the circle
-                    // instead of piling onto the middle.
                     const double Spread = 0.30 + ((double)((Seed >> 12) % 60) / 100.0);
 
                     const double Out = (double)ZoneRadius * Spread * (double)(Fraction / 0.5f);
@@ -13333,8 +12456,6 @@ namespace BotAI
                         Move->MaxWalkSpeed = 510.f;
                 }
 
-                // Straight towards its own spot in the circle, a hop at a time. The recorded routes
-                // ("navmesh") are no longer used for this.
                 FVector Hop = Goal;
 
                 {
@@ -13452,8 +12573,6 @@ namespace BotAI
                 {
                     BotWanderDirTick[Pawn] = reportCounter_forDir;
 
-                    // A random direction and distance, walked in a straight line. No navmesh query and
-                    // no recorded places -- bots find each other with their eyes now, not a route.
                     FVector Dest;
 
                     {
@@ -13519,12 +12638,6 @@ namespace BotAI
                                 Push.Z = 0.0;
                                 Pawn->AddMovementInput(Push, 1.f, false);
 
-                                // Face the way it is trying to go. (This used to "swing the pickaxe" here too, but the
-                                // pickaxe was put in its hands with ServerExecuteInventoryItem -- a real player's
-                                // controller function that does nothing on a bot's AI controller -- so it was still
-                                // holding its GUN when it pulled the trigger, and nothing ever let go of it. Every bot
-                                // that had ever got stuck walking into something then fired nonstop at whatever it
-                                // faced, hills and its target included. The push and the hop get it unstuck.)
                                 if ((reportCounter_forDir % 8) == 0)
                                 {
                                     const double FaceYaw = atan2(GoalDy, GoalDx) * (180.0 / 3.14159265358979323846);
@@ -13585,7 +12698,6 @@ namespace BotAI
                     "hops while chasing: %d",
                     GLocksMade, GLocksEnded, LockedNow, GBurstsCutOutOfSight, GTicksHeldFireOutOfSight, GAimDeliberateMisses, GChaseHops);
 
-            // The checks on what really happened (not what the code meant to happen):
             LogLine("[TRIGGER] Ticks a bot's gun actually went off: in its own bursts %d | with nothing in the bot code pulling the "
                     "trigger %d (let go of every time -- this should stay at 0).",
                     GShotTicksOurs, GShotTicksStray);
@@ -13766,8 +12878,6 @@ namespace BotAI
 
         GStormTick++;
 
-        // Before anything below counts who is alive: a bot the bus moved off its own pawn is put back on it (or given
-        // a new one) -- see KeepBotsOnTheirOwnPawns. Only does anything around the bus.
         KeepBotsOnTheirOwnPawns(GameState);
 
         PlaceDump::EnsureLoaded();
@@ -13854,10 +12964,6 @@ namespace BotAI
 
                     const bool bDegenerate = !((float)Ind->SafeZoneFinishShrinkTime > Now + 1.f);
 
-                    // Does this phase move the wall at all? On 1.8.2, phase 0 is the game's own "no storm yet" step: the
-                    // whole map (185000) to the whole map, with no time on it, and the game moves straight on to the first
-                    // real circle the next tick. The last build caught that step and gave it 30s to hold and 20s to "close"
-                    // without the wall moving -- the "30 seconds ... nothing" on the HUD before the real storm started.
                     const float LastR = Ind->HasLastRadius() ? (float)Ind->LastRadius : -1.f;
                     const float NextR = Ind->HasNextRadius() ? (float)Ind->NextRadius : -1.f;
                     const bool bWallStays = LastR > 0.f && NextR > 0.f && NextR >= LastR - 1.f;
@@ -13870,8 +12976,7 @@ namespace BotAI
                     }
                     else if (bDegenerate)
                     {
-                        // A real circle that arrived with no time on it would otherwise close the moment it appeared:
-                        // given this build's own Season 1 timing for its phase instead.
+
                         float RescueWait = 0.f, RescueShrink = 0.f;
                         SeasonOneStormTiming(StormPhaseNow, RescueWait, RescueShrink);
 
@@ -13904,7 +13009,6 @@ namespace BotAI
                     humanCount++;
             }
 
-            // Prefer waiting for a real player, but do not block forever if detection fails.
             static float FirstTickTime = -1.f;
             if (FirstTickTime < 0.f)
                 FirstTickTime = Now;
@@ -14061,7 +13165,7 @@ namespace BotAI
 
         ClaimServerOwner(GameState);
 
-        GiveFreshBotPawnsHealth(GameState);   // before anything below counts who is alive
+        GiveFreshBotPawnsHealth(GameState);   
         LogHudState();
         UpdateHudCounts();
 
@@ -14080,7 +13184,7 @@ namespace BotAI
         DressUndressedBots();
         ArmLandedBots(World, GameState);
         TickMovement(World, GameState, GameMode);
-        TickBotBodies(World, GameState);   // after TickMovement: carries out the walks and the aim it just set
+        TickBotBodies(World, GameState);   
         TickParachutes(World);
         TickLandings(World);
     }

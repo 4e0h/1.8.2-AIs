@@ -22,10 +22,8 @@ namespace PlaceDump
 
     int GetSpreadLandingSpots(int Count, FVector* OutSpots);
 
-    // The middle of a recorded "# POI" file, looked up by the name it was saved under.
     bool GetLandmark(const char* Name, FVector& Out);
 
-    // Landing spots taken from the recorded places around a point.
     int GetPlacesNear(const FVector& Near, float WithinDistance, int Count, FVector* OutSpots);
 
     void ReportOnce();

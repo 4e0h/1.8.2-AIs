@@ -1,12 +1,5 @@
 #pragma once
 
-// The recorded POI walks, baked in.
-//
-// These used to have to be copied into the folder on disk by hand, which meant a fresh copy of the
-// server came up with no idea where anywhere was. Generated from the nine recordings; each array is
-// the walk through that place, thinned to one point per 250-unit square so the file stays a sensible
-// size. Anything dropped into the folder on disk is still read as well, and is added to these.
-
 namespace BakedPlaces
 {
     struct FPoint
@@ -23,7 +16,6 @@ namespace BakedPlaces
         int Count;
     };
 
-    // Catty Corner -- 431 places
     static const FPoint CattyCorner[] = {
         {-72322.f,77332.f,5309.f}, {-72435.f,77654.f,5318.f}, {-72477.f,77773.f,5324.f}, {-72522.f,77898.f,5326.f},
         {-72579.f,78061.f,5324.f}, {-72677.f,78338.f,5332.f}, {-72771.f,78623.f,5334.f}, {-72793.f,78750.f,5337.f},
@@ -135,7 +127,6 @@ namespace BakedPlaces
         {-74849.f,80028.f,5145.f}, {-76275.f,77192.f,5072.f}, {-76666.f,77307.f,5072.f},
     };
 
-    // Dooms Domain -- 1440 places
     static const FPoint DoomsDomain[] = {
         {74838.f,-22470.f,-2219.f}, {74680.f,-22506.f,-2219.f}, {74417.f,-22548.f,-2219.f}, {74140.f,-22536.f,-2219.f},
         {73809.f,-22574.f,-2219.f}, {73635.f,-22579.f,-2219.f}, {73490.f,-22582.f,-2219.f}, {73142.f,-22593.f,-2219.f},
@@ -499,7 +490,6 @@ namespace BakedPlaces
         {68836.f,-22360.f,-2232.f}, {69463.f,-22764.f,-2236.f}, {69655.f,-22792.f,-2237.f}, {72362.f,-22777.f,-2199.f},
     };
 
-    // Lazy Lake -- 974 places
     static const FPoint LazyLake[] = {
         {-43912.f,64242.f,2797.f}, {-44044.f,63974.f,2794.f}, {-44197.f,63686.f,2791.f}, {-44295.f,63516.f,2789.f},
         {-44441.f,63269.f,2786.f}, {-44495.f,63147.f,2784.f}, {-44561.f,62872.f,2780.f}, {-44567.f,62746.f,2775.f},
@@ -747,7 +737,6 @@ namespace BakedPlaces
         {-52417.f,55925.f,2776.f}, {-52216.f,55938.f,2773.f},
     };
 
-    // Misty Meadows -- 513 places
     static const FPoint MistyMeadows[] = {
         {-89050.f,31062.f,1617.f}, {-89178.f,30969.f,1617.f}, {-89325.f,30866.f,1617.f}, {-89587.f,30665.f,1616.f},
         {-89714.f,30465.f,1616.f}, {-89782.f,30203.f,1616.f}, {-89779.f,29944.f,1619.f}, {-89744.f,29767.f,1618.f},
@@ -880,7 +869,6 @@ namespace BakedPlaces
         {-87787.f,21735.f,1617.f},
     };
 
-    // Salty Springs -- 1288 places
     static const FPoint SaltySprings[] = {
         {20570.f,-20698.f,-1451.f}, {20414.f,-20701.f,-1451.f}, {20131.f,-20697.f,-1451.f}, {19913.f,-20666.f,-1452.f},
         {19677.f,-20615.f,-1452.f}, {19381.f,-20512.f,-1452.f}, {19173.f,-20376.f,-1452.f}, {19019.f,-20112.f,-1464.f},
@@ -1206,7 +1194,6 @@ namespace BakedPlaces
         {10763.f,-23397.f,-1067.f}, {10859.f,-23516.f,-1067.f}, {11229.f,-23362.f,-1067.f}, {11240.f,-23523.f,-1067.f},
     };
 
-    // Slurpy Swamp -- 690 places
     static const FPoint SlurpySwamp[] = {
         {-69374.f,-33111.f,-2989.f}, {-69388.f,-33330.f,-2981.f}, {-69407.f,-33602.f,-2979.f}, {-69421.f,-33797.f,-2980.f},
         {-69450.f,-34175.f,-2981.f}, {-69460.f,-34310.f,-2982.f}, {-69493.f,-34609.f,-2980.f}, {-69524.f,-34739.f,-2978.f},
@@ -1383,7 +1370,6 @@ namespace BakedPlaces
         {-67126.f,-55740.f,-2992.f}, {-67315.f,-55750.f,-2992.f},
     };
 
-    // Stark Industries -- 1099 places
     static const FPoint StarkIndustries[] = {
         {23111.f,37958.f,3152.f}, {23275.f,37864.f,3153.f}, {23505.f,37779.f,3152.f}, {23638.f,37745.f,3151.f},
         {23757.f,37714.f,3152.f}, {24100.f,37623.f,3153.f}, {24302.f,37562.f,3153.f}, {24660.f,37430.f,3153.f},
@@ -1662,7 +1648,6 @@ namespace BakedPlaces
         {25480.f,53981.f,3152.f}, {25268.f,55399.f,3152.f}, {25362.f,55525.f,3152.f},
     };
 
-    // The Ruins -- 1150 places
     static const FPoint TheRuins[] = {
         {-570.f,8555.f,-2234.f}, {-447.f,8604.f,-2229.f}, {-218.f,8712.f,-2204.f}, {-85.f,8770.f,-2185.f},
         {85.f,8843.f,-2153.f}, {271.f,8923.f,-2124.f}, {457.f,9003.f,-2109.f}, {643.f,9082.f,-2114.f},
@@ -1954,7 +1939,6 @@ namespace BakedPlaces
         {-1337.f,10438.f,-2463.f}, {-1217.f,10291.f,-2523.f},
     };
 
-    // Weeping Woods -- 3602 places
     static const FPoint WeepingWoods[] = {
         {-9364.f,-16572.f,-1838.f}, {-9547.f,-16570.f,-1838.f}, {-9884.f,-16567.f,-1838.f}, {-10034.f,-16565.f,-1838.f},
         {-10360.f,-16546.f,-1838.f}, {-10531.f,-16477.f,-1844.f}, {-10831.f,-16276.f,-1848.f}, {-10957.f,-16194.f,-1851.f},
@@ -2873,14 +2857,6 @@ namespace BakedPlaces
 
     static const int AreaCount = 9;
 
-    // ---- the walks between those places ----------------------------------------------------
-    //
-    // Recorded on foot from one POI to the next. Without these the nine areas above are nine
-    // islands with nothing joining them, so a bot could find its way around a POI and had no idea
-    // how to get from one to another. The recordings interleave the player's own walk with samples
-    // of bots standing elsewhere on the map; only the continuous walk is kept here.
-
-    // Dooms Domain path to Stark Industries 1 -- 356 places
     static const FPoint DoomsDomainpathtoStarkIndustries1[] = {
         {69918.f,-9444.f,-2227.f}, {70045.f,-9180.f,-2227.f}, {70232.f,-8934.f,-2227.f}, {70295.f,-8822.f,-2227.f},
         {70335.f,-8683.f,-2227.f}, {70384.f,-8386.f,-2225.f}, {70403.f,-8088.f,-2215.f}, {70401.f,-7949.f,-2215.f},
@@ -2973,7 +2949,6 @@ namespace BakedPlaces
         {27908.f,43477.f,3148.f}, {27616.f,43470.f,3148.f}, {27479.f,43431.f,3157.f}, {27186.f,43394.f,3148.f},
     };
 
-    // Salty Springs path to Dooms Domain 1 -- 216 places
     static const FPoint SaltySpringspathtoDoomsDomain1[] = {
         {15338.f,-20827.f,-1440.f}, {15607.f,-20826.f,-1439.f}, {15887.f,-20814.f,-1438.f}, {16032.f,-20808.f,-1438.f},
         {16321.f,-20800.f,-1439.f}, {16610.f,-20793.f,-1440.f}, {16784.f,-20789.f,-1440.f}, {17073.f,-20782.f,-1441.f},
@@ -3031,7 +3006,6 @@ namespace BakedPlaces
         {61530.f,-20195.f,-2227.f}, {61816.f,-20196.f,-2227.f}, {62129.f,-20178.f,-2227.f}, {62269.f,-20167.f,-2227.f},
     };
 
-    // Stark Industries path to Dirty Docks 1 -- 406 places
     static const FPoint StarkIndustriespathtoDirtyDocks1[] = {
         {28371.f,43762.f,3148.f}, {28648.f,43735.f,3148.f}, {28766.f,43645.f,3148.f}, {29031.f,43511.f,3157.f},
         {29161.f,43456.f,3157.f}, {29284.f,43361.f,3157.f}, {29539.f,43234.f,3148.f}, {29808.f,43184.f,3148.f},
@@ -3137,7 +3111,6 @@ namespace BakedPlaces
         {22993.f,110057.f,-2603.f}, {22656.f,110353.f,-2611.f},
     };
 
-    // The Ruins path to Salty Springs 1 -- 105 places
     static const FPoint TheRuinspathtoSaltySprings1[] = {
         {8446.f,405.f,-1468.f}, {8427.f,241.f,-1480.f}, {8254.f,-126.f,-1641.f}, {8182.f,-267.f,-1748.f},
         {8199.f,-554.f,-1916.f}, {8254.f,-835.f,-2088.f}, {8347.f,-1108.f,-2203.f}, {8447.f,-1377.f,-2243.f},
@@ -3168,7 +3141,6 @@ namespace BakedPlaces
         {16565.f,-20974.f,-1439.f},
     };
 
-    // The Ruins path to Salty Springs 3 -- 170 places
     static const FPoint TheRuinspathtoSaltySprings3[] = {
         {8305.f,528.f,-1465.f}, {8255.f,369.f,-1473.f}, {8206.f,245.f,-1494.f}, {8053.f,-23.f,-1667.f},
         {8000.f,-311.f,-1838.f}, {7982.f,-583.f,-1986.f}, {8017.f,-865.f,-2134.f}, {8064.f,-1001.f,-2186.f},
@@ -3215,7 +3187,6 @@ namespace BakedPlaces
         {14740.f,-20886.f,-1444.f}, {14472.f,-20868.f,-1445.f},
     };
 
-    // The Ruins path to Salty Sprintg 2 -- 115 places
     static const FPoint TheRuinspathtoSaltySprintg2[] = {
         {4402.f,-125.f,-1832.f}, {4376.f,-264.f,-1831.f}, {4310.f,-592.f,-1843.f}, {4335.f,-889.f,-1929.f},
         {4347.f,-1020.f,-2010.f}, {4287.f,-1296.f,-2187.f}, {4244.f,-1432.f,-2219.f}, {4199.f,-1566.f,-2239.f},

@@ -1,43 +1,7 @@
-// https://github.com/kem0x/memcury
+
 
 #pragma once
 
-/*
-   Memcury is a single-header file library for memory manipulation in C++.
-
-   Containers:
-       -PE::Address: A pointer container.
-       -PE::Section: Portable executable section container for internal usage.
-
-   Modules:
-       -Scanner:
-           -Constructors:
-               -Default: Takes a pointer to start the scanning from.
-               -FindPattern: Finds a pattern in memory.
-               -FindStringRef: Finds a string reference in memory, supports all types of strings.
-           -Functions:
-               -SetTargetModule: Sets the target module for the scanner.
-               -ScanFor: Scans for a byte(s) near the current address.
-               -FindFunctionBoundary: Finds the boundary of a function near the current address.
-               -RelativeOffset: Gets the relative offset of the current address.
-               -AbsoluteOffset: Gets the absolute offset of the current address.
-               -GetAs: Gets the current address as a type.
-               -Get: Gets the current address as an int64.
-
-       -TrampolineHook:
-           -Constructors:
-               -Default: Takes a pointer pointer to the target function and a pointer to the hook function.
-           -Functions:
-               -Commit: Commits the hook.
-               -Revert: Reverts the hook.
-               -Toggle: Toggles the hook on\off.
-
-       -VEHHook:
-           -Functions:
-               -Init: Initializes the VEH Hook system.
-               -AddHook: Adds a hook to the VEH Hook system.
-               -RemoveHook: Removes a hook from the VEH Hook system.
-*/
 #include <DbgHelp.h>
 #include <Windows.h>
 #include <format>
@@ -129,7 +93,7 @@ namespace Memcury
 
             GlobalFree(mem);
         }
-    } // namespace Util
+    } 
 
     namespace Safety
     {
@@ -185,18 +149,18 @@ namespace Memcury
                 printf("[%lu] Name: %s - Address: %p  - Module: %s\n", frame, symbolInfo->Name, (void*)symbolInfo->Address, module);
             }
         }
-    } // namespace Safety
+    } 
 
     namespace Globals
     {
         constexpr const bool bLogging = true;
 
         static const char* moduleName = nullptr;
-    } // namespace Globals
+    } 
 
     namespace ASM
     {
-        //@todo: this whole namespace needs a rework, should somehow make this more modern and less ugly.
+        
         enum MNEMONIC : uint8_t
         {
             JMP_REL8 = 0xEB,
@@ -340,7 +304,7 @@ namespace Memcury
             }
             return bytes;
         }
-    } // namespace ASM
+    } 
 
     namespace PE
     {
@@ -352,7 +316,7 @@ namespace Memcury
         inline auto GetModuleBase() -> uintptr_t
         {
             return ImageBase;
-            // return Globals::moduleName == 0 ? ImageBase : uint64_t(GetModuleHandleA(Globals::moduleName));
+            
         }
 
         inline auto GetDOSHeader() -> PIMAGE_DOS_HEADER
@@ -560,7 +524,7 @@ namespace Memcury
                 return address >= GetSectionStart() && address < GetSectionEnd();
             }
         };
-    } // namespace PE
+    } 
 
     class Scanner
     {
@@ -758,20 +722,19 @@ namespace Memcury
                 }
             }
         _out:
-            // MemcuryAssertM(add != 0, "FindPattern return nullptr");
 
             if (bWarnIfNotFound)
             {
                 if (add == 0)
                 {
-                    // MessageBoxA(0, ("FindPattern " + std::string(signature) + " null").c_str(), "Memcury", MB_ICONERROR);
+                    
                 }
             }
 
             return Scanner(add);
         }
 
-        static auto FindPointerRef(void* Pointer, int useRefNum = 0, bool bUseFirstResult = false, bool bWarnIfNotFound = true) -> Scanner // credit me and ender
+        static auto FindPointerRef(void* Pointer, int useRefNum = 0, bool bUseFirstResult = false, bool bWarnIfNotFound = true) -> Scanner 
         {
             PE::Address add{ nullptr };
 
@@ -784,13 +747,11 @@ namespace Memcury
 
             int aa = 0;
 
-            // scan only text section
-
             __m128i t = _mm_set1_epi8((char)0x89);
             __m128i s = _mm_set1_epi8((char)0xf9);
 
             __m128i t2 = _mm_set1_epi8((char)0xe8);
-            // scan only text section
+            
             DWORD i = 0;
 
             for (; i < textSection.GetSectionSize() - (textSection.GetSectionSize() % 16); i += 16)
@@ -811,13 +772,9 @@ namespace Memcury
                                 auto sub = (scanBytes[i + q - 1] & 0xFB) == 0x48;
                                 add = PE::Address(&scanBytes[i + q - sub]);
 
-                                // LOG_INFO(LogDev, "2add: 0x{:x}", add.Get() - __int64(GetModuleHandleW(0)));
-
                                 if (bUseFirstResult)
                                     return Scanner(add);
 
-                                /* if (++aa > useRefNum)
-                                    break; */
                             }
                         }
                     }
@@ -836,13 +793,9 @@ namespace Memcury
                             {
                                 add = PE::Address(&scanBytes[i + q]);
 
-                                // LOG_INFO(LogDev, "1add: 0x{:x}", add.Get() - __int64(GetModuleHandleW(0)));
-
                                 if (bUseFirstResult)
                                     return Scanner(add);
 
-                                /* if (++aa > useRefNum)
-                                    break; */
                             }
                         }
                     }
@@ -853,18 +806,17 @@ namespace Memcury
             {
                 if (add == 0)
                 {
-                    // MessageBoxA(0, "FindPointerRef return nullptr", "Memcury", MB_OK);
+                    
                 }
                 else
                 {
-                    // MessageBoxA(0, std::format("FindPointerRef return 0x{:x}", add.Get() - __int64(GetModuleHandleW(0))).c_str(), "Memcury", MB_OK);
+                    
                 }
             }
 
             return Scanner(add);
         }
 
-        // Supports wide and normal strings both std and pointers
         template <typename T = const wchar_t*>
         static auto FindStringRef(T string, bool bWarnIfNotFound = true, int useRefNum = 0, bool bIsInFunc = false, bool bSkunky = false) -> Scanner
         {
@@ -892,7 +844,7 @@ namespace Memcury
             if (HasAVX2)
             {
                 __m256i t = _mm256_set1_epi8((char)0x8d);
-                // scan only text section
+                
                 for (; i < textSection.GetSectionSize() - (textSection.GetSectionSize() % 32); i += 32)
                 {
                     auto bytes = _mm256_load_si256((const __m256i*)(scanBytes + i));
@@ -906,12 +858,11 @@ namespace Memcury
                         int c = offset & (1 << q);
                         if (c)
                         {
-                            // if (scanBytes[i + q + 1] == ASM::LEA)
+                            
                             if ((scanBytes[i + q - 1] & 0xFB) == 0x48)
                             {
                                 auto stringAdd = PE::Address(&scanBytes[i + q]).RelativeOffset(2);
 
-                                // Check if the string is in the .rdata section
                                 if (rdataSection.isInSection(stringAdd))
                                 {
                                     auto strBytes = stringAdd.GetAs<std::uint8_t*>();
@@ -919,19 +870,17 @@ namespace Memcury
                                     if (bUE51 && bIsInFunc)
                                     {
                                         auto pointerToRef = *(LPVOID*)strBytes;
-                                        if (rdataSection.isInSection(pointerToRef)) // Credit: Ender
+                                        if (rdataSection.isInSection(pointerToRef)) 
                                         {
                                             strBytes = (std::uint8_t*)pointerToRef;
                                             stringAdd = PE::Address(pointerToRef);
                                         }
                                     }
 
-                                    // Check if the first char is printable
-                                    // if (ASM::byteIsAscii(strBytes[0]))
                                     {
                                         if constexpr (!bIsPtr)
                                         {
-                                            // typedef T::value_type char_type;
+                                            
                                             using char_type = std::decay_t<std::remove_pointer_t<T>>;
 
                                             auto lea = stringAdd.GetAs<char_type*>();
@@ -981,7 +930,7 @@ namespace Memcury
             else
             {
                 __m128i t = _mm_set1_epi8((char)0x8d);
-                // scan only text section
+                
                 for (; i < textSection.GetSectionSize() - (textSection.GetSectionSize() % 16); i += 16)
                 {
                     auto bytes = _mm_load_si128((const __m128i*)(scanBytes + i));
@@ -999,7 +948,6 @@ namespace Memcury
                             {
                                 auto stringAdd = PE::Address(&scanBytes[i + q]).RelativeOffset(2);
 
-                                // Check if the string is in the .rdata section
                                 if (rdataSection.isInSection(stringAdd))
                                 {
                                     auto strBytes = stringAdd.GetAs<std::uint8_t*>();
@@ -1007,19 +955,17 @@ namespace Memcury
                                     if (bUE51 && bIsInFunc)
                                     {
                                         auto pointerToRef = *(LPVOID*)strBytes;
-                                        if (rdataSection.isInSection(pointerToRef)) // Credit: Ender
+                                        if (rdataSection.isInSection(pointerToRef)) 
                                         {
                                             strBytes = (std::uint8_t*)pointerToRef;
                                             stringAdd = PE::Address(pointerToRef);
                                         }
                                     }
 
-                                    // Check if the first char is printable
-                                    // if (ASM::byteIsAscii(strBytes[0]))
                                     {
                                         if constexpr (!bIsPtr)
                                         {
-                                            // typedef T::value_type char_type;
+                                            
                                             using char_type = std::decay_t<std::remove_pointer_t<T>>;
 
                                             auto lea = stringAdd.GetAs<char_type*>();
@@ -1068,22 +1014,17 @@ namespace Memcury
             }
         _out:
 
-            // MemcuryAssertM(add != 0, "FindStringRef return nullptr");
-
             if (bWarnIfNotFound)
             {
                 if (add == 0)
                 {
                     if constexpr (bIsWide)
                     {
-                        // std::wstring wstr = std::wstring(string);
 
-                        // auto aaa = (L"failed FindStringRef " + std::wstring(string));
-                        // MessageBoxA(0, std::string(aaa.begin(), aaa.end()).c_str(), "Memcury", MB_ICONERROR);
                     }
                     else
                     {
-                        // MessageBoxA(0, ("failed FindStringRef " + std::string(string)).c_str(), "Memcury", MB_ICONERROR);
+                        
                     }
                 }
             }
@@ -1094,14 +1035,12 @@ namespace Memcury
                 {
                     for (int i = 0; i < 300; i++)
                     {
-                        // if (!bSkunky ? (*(uint8_t*)(add.Get() - i) == 0x48 && *(uint8_t*)(add.Get() - i + 1) == 0x83) :
-                        //     (*(uint8_t*)(add.Get() - i) == 0x4C && *(uint8_t*)(add.Get() - i + 1) == 0x8B && *(uint8_t*)(add.Get() - i + 2) == 0xDC))
+
                         if (*(uint8_t*)(add.Get() - i) == 0x48 && *(uint8_t*)(add.Get() - i + 1) == 0x83 && *(uint8_t*)(add.Get() - i + 2) == 0xEC)
                         {
                             int sub = 0;
                             if (*(uint8_t*)(add.Get() - i - 3) == 0x4C && *(uint8_t*)(add.Get() - i - 2) == 0x8B && *(uint8_t*)(add.Get() - i - 1) == 0xDC)
                                 sub = 3;
-                            // MessageBoxA(0, std::format("0x{:x}", (__int64(add.Get() - i) - __int64(GetModuleHandleW(0)))).c_str(), "Memcury", MB_OK);
 
                             auto beginFunc = Scanner(add.Get() - i - sub);
 
@@ -1141,7 +1080,6 @@ namespace Memcury
 
                     if (bIgnoreFF && currentOpcode == 0xFF)
                         continue;
-                    // LOG_INFO(LogDev, "[{} 0x{:x}] 0x{:x}", i, __int64(&scanBytes[i]) - __int64(GetModuleHandleW(0)), currentOpcode);
 
                     found = currentOpcode == scanBytes[i + k];
                 }
@@ -1185,8 +1123,6 @@ namespace Memcury
                     if (currentOpcode == -1)
                         continue;
 
-                    // LOG_INFO(LogDev, "[{} 0x{:x}] 0x{:x}", i, __int64(&scanBytes[i]) - __int64(GetModuleHandleW(0)), currentOpcode);
-
                     found = currentOpcode == scanBytes[i + k];
                 }
 
@@ -1217,9 +1153,8 @@ namespace Memcury
 
             for (auto i = (forward ? 1 : -1); forward ? (i < 2048) : (i > -2048); forward ? i++ : i--)
             {
-                if ( // ASM::byteIsA(scanBytes[i], ASM::MNEMONIC::JMP_REL8) ||
-                     // ASM::byteIsA(scanBytes[i], ASM::MNEMONIC::JMP_REL32) ||
-                     // ASM::byteIsA(scanBytes[i], ASM::MNEMONIC::JMP_EAX) ||
+                if ( 
+
                     ASM::byteIsA(scanBytes[i], ASM::MNEMONIC::RETN_REL8) || ASM::byteIsA(scanBytes[i], ASM::MNEMONIC::RETN) || ASM::byteIsA(scanBytes[i], ASM::MNEMONIC::INT3))
                 {
                     _address = (uintptr_t)&scanBytes[i + 1];
@@ -1266,7 +1201,6 @@ namespace Memcury
         }
     };
 
-    /* Bad don't use it tbh... */
     class TrampolineHook
     {
         void** originalFunctionPtr;
@@ -1291,7 +1225,7 @@ namespace Memcury
             GetSystemInfo(&sysInfo);
             const uint64_t PAGE_SIZE = sysInfo.dwPageSize;
 
-            uint64_t startAddr = (uint64_t(targetAddr) & ~(PAGE_SIZE - 1)); // round down to nearest page boundary
+            uint64_t startAddr = (uint64_t(targetAddr) & ~(PAGE_SIZE - 1)); 
             uint64_t minAddr = min(startAddr - 0x7FFFFF00, (uint64_t)sysInfo.lpMinimumApplicationAddress);
             uint64_t maxAddr = max(startAddr + 0x7FFFFF00, (uint64_t)sysInfo.lpMaximumApplicationAddress);
 
@@ -1340,10 +1274,10 @@ namespace Memcury
                 0x00,
                 0x00,
                 0x00,
-                0x00, // mov r10, addr
+                0x00, 
                 0x41,
                 0xFF,
-                0xE2 // jmp r10
+                0xE2 
             };
 
             auto destination64 = (uint64_t)destination;
@@ -1353,13 +1287,9 @@ namespace Memcury
 
         uintptr_t PrepareRestore()
         {
-            /*
-                This is not a correct way to do it at all, since not all functions sub from the stack
-                This needs so much more tests, but it works for now.
-            */
 
             Scanner scanner(originalFunction);
-            scanner.ScanFor({ 0x48, 0x83, 0xEC }); // sub rsp
+            scanner.ScanFor({ 0x48, 0x83, 0xEC }); 
 
             auto restoreSize = scanner.Get() - originalFunction.Get();
 
@@ -1382,7 +1312,6 @@ namespace Memcury
 
             *originalFunctionPtr = restorePtr.GetAs<void*>();
 
-            // Write a jump back to where the execution should resume
             restorePtr.AbsoluteOffset((uint32_t)restore.size());
 
             auto contuineExecution = originalFunction + restore.size();
@@ -1456,8 +1385,6 @@ namespace Memcury
 
             *originalFunctionPtr = originalFunction.GetAs<void*>();
 
-            // VirtualFree(allocatedPage.GetAs<void*>(), 0x1000, MEM_RELEASE);
-
             return true;
         }
 
@@ -1500,13 +1427,13 @@ namespace Memcury
                     Exception->ContextRecord->Rip = (uintptr_t)Itr->Detour;
                 }
 
-                Exception->ContextRecord->EFlags |= 0x100; // SINGLE_STEP_FLAG
+                Exception->ContextRecord->EFlags |= 0x100; 
 
                 return EXCEPTION_CONTINUE_EXECUTION;
             }
             else if (Exception->ExceptionRecord->ExceptionCode == STATUS_SINGLE_STEP)
             {
-                // TODO: find a way to only vp the function that about to get executed
+                
                 for (auto& Hook : Hooks)
                 {
                     DWORD dwOldProtect;
@@ -1568,8 +1495,8 @@ namespace Memcury
 
             return false;
         }
-    } // namespace VEHHook
-} // namespace Memcury
+    } 
+} 
 
 inline bool IsBadReadPtr(void* p)
 {
@@ -1578,7 +1505,7 @@ inline bool IsBadReadPtr(void* p)
     {
         DWORD mask = (PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY);
         bool b = !(mbi.Protect & mask);
-        // check the page is not a guard page
+        
         if (mbi.Protect & (PAGE_GUARD | PAGE_NOACCESS))
             b = true;
 
@@ -1612,8 +1539,7 @@ inline uintptr_t FindNameRef(const wchar_t* Name, int skip = 0, bool bWarnString
     return PtrRef.Get();
 }
 
-// Finds a string ref, then goes searches xref of the function that it's in and returns that address.
-inline uintptr_t FindFunctionCall(const wchar_t* Name, const std::vector<uint8_t>& Bytes = std::vector<uint8_t>{ 0x48, 0x89, 0x5C }, int skip = 0, bool bWarnStringNotFound = true) // credit ender & me
+inline uintptr_t FindFunctionCall(const wchar_t* Name, const std::vector<uint8_t>& Bytes = std::vector<uint8_t>{ 0x48, 0x89, 0x5C }, int skip = 0, bool bWarnStringNotFound = true) 
 {
     auto NameRef = FindNameRef(Name, skip, bWarnStringNotFound);
 
@@ -1625,8 +1551,6 @@ inline uintptr_t FindFunctionCall(const wchar_t* Name, const std::vector<uint8_t
 
 inline bool IsNullSub(uint64_t Addr)
 {
-    // if (*(uint8_t*)(Addr) == 0xEB && *(uint8_t*)(Addr + 1) == 0xF7) // positive sp value has been detected, the output may be wrong!
-    // return true;
 
     return *(uint8_t*)(Addr) == 0xC3 || *(uint8_t*)(Addr) == 0xC2;
 }

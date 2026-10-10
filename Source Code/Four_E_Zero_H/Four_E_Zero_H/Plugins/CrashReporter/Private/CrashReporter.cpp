@@ -100,14 +100,6 @@ LONG WINAPI four_e_zero_h_UnhandledExceptionFilter(LPEXCEPTION_POINTERS Exceptio
     if ((ExceptionInfo->ExceptionRecord->ExceptionCode & 0x80000000) == 0 || (ExceptionInfo->ExceptionRecord->ExceptionCode & 0x30000000) != 0)
         return EXCEPTION_CONTINUE_SEARCH;
 
-    
-
-    
-
-    
-
-    
-
     if (ExceptionInfo->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION && ExceptionInfo->ContextRecord->Rip == 0)
     {
         DWORD64 ReturnAddress = 0;
@@ -116,8 +108,6 @@ LONG WINAPI four_e_zero_h_UnhandledExceptionFilter(LPEXCEPTION_POINTERS Exceptio
         {
             const long Count = InterlockedIncrement(&GRecoveredNullCalls);
 
-            
-            
             if (Count <= 20 || (Count % 1000) == 0)
             {
                 const DWORD64 Base = (DWORD64)GetModuleHandleW(nullptr);
@@ -139,10 +129,6 @@ LONG WINAPI four_e_zero_h_UnhandledExceptionFilter(LPEXCEPTION_POINTERS Exceptio
         }
     }
 
-    
-
-    
-    
     if (GGuardDepth > 0)
     {
         printf("[CrashReporter] Fault inside a guarded section (Code: 0x%08X) -- handing it to the guard instead of ending the match.\n",

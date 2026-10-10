@@ -1731,9 +1731,7 @@ uint8_t AFortGameMode::PickTeam(AFortGameMode* GameMode, uint8_t PreferredTeam, 
 
 bool AFortGameMode::StartAircraftPhase(AFortGameMode* GameMode, char a2)
 {
-    // One gate for the whole build. The console command, the GUI button, the net driver's warmup
-    // timer, the bot countdown and the game's own internal timer all arrive here, so refusing here
-    // means the bus genuinely stays on the ground -- there is no other way out.
+
     if (!BotAI::BusIsClearedForLaunch())
     {
         static int Refused = 0;
@@ -2113,9 +2111,6 @@ void SpawnInitialSafeZone(AFortGameMode* GameMode)
     StartNewSafeZonePhase(GameMode, StartPhase, true);
 }
 
-// While the zone is paused we take every phase's storm damage down to nothing and keep the originals
-// here, so that even if something else in the game decides to hurt a player who is stood outside the
-// circle, there is no damage left to deal. Resuming puts the real numbers straight back.
 static bool GStormDamageParked = false;
 static std::vector<float> GParkedStormDamage;
 
@@ -2184,9 +2179,7 @@ void UpdateSafeZonesPhase(AFortGameMode* GameMode)
 {
     if (UFortGameStateComponent_BattleRoyaleGamePhaseLogic::bPausedZone)
     {
-        // A real pause. The game's own safe-zone update is what shrinks the wall and deals the damage,
-        // so while the zone is held we simply do not run it. Holding the two shrink timestamps on top
-        // of that keeps the circle drawn on everyone's map exactly where it is.
+
         if (GameMode && GameMode->SafeZoneIndicator)
         {
             const float Now = (float)UGameplayStatics::GetTimeSeconds(GameMode);

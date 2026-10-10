@@ -53,14 +53,7 @@ UFortWorldItem* AFortInventory::GiveItem(const UFortItemDefinition* Def, int Cou
         auto PlayerController = (AFortPlayerControllerAthena*)Owner;
         if (IsPrimaryQuickbar(Def) || Def->ItemType == EFortItemType::GetBuildingPiece() || Def->ItemType == EFortItemType::GetTrap() || Def->ItemType == EFortItemType::GetWeaponHarvest())
         {
-            // Only a controller that has a quickbar actor can have the item put on it. The bots are real
-            // Athena_PlayerControllers spawned by the bot code; they never go through HandleStartingNewPlayer,
-            // which is what gives a player its quickbars, so theirs is null. Calling ServerAddItemInternal on
-            // that null quickbar faulted the first time a bot was given anything (the "[GUARD] ... fault #1"
-            // right as the first bot spawned). Worse, that first call is also where the function gets looked up
-            // and remembered: it was remembered as "not found" for good, so every ServerAddItemInternal after it
-            // did nothing -- the real player's too. Their pickaxe, guns and building pieces sat in the inventory
-            // but never reached the quickbar, which is the stripped inventory and the missing building pieces.
+
             static auto PlayerControllerClass = AFortPlayerControllerAthena::StaticClass();
             auto QuickBars = (PlayerController && PlayerControllerClass && PlayerController->IsA(PlayerControllerClass)) ? PlayerController->QuickBars : nullptr;
 
@@ -219,7 +212,6 @@ void AFortInventory::Remove(FGuid Guid)
 
     auto PlayerController = (AFortPlayerControllerAthena*)Owner;
 
-    // Same as GiveItem: a bot's controller has no quickbars, so there is nothing to take the item off.
     static auto PlayerControllerClass = AFortPlayerControllerAthena::StaticClass();
     const bool bHasQuickBars = PlayerController && PlayerControllerClass && PlayerController->IsA(PlayerControllerClass) && PlayerController->QuickBars;
 
