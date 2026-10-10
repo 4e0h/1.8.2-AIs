@@ -1,10 +1,20 @@
 ## A gameserver for v1.8.2 with player AIs
 ### If you would like to skid pls credit me, ploosh, pongo, and ralzify <3
 
-<details open>
-  <summary>Stuff il fix tmrw</summary>
+<details>
+  <summary>Quick Commands</summary>
   <ul>
-    <li>Quick commands</li>
+    <li>cheat ar leg</li>
+    <li>cheat ar epic</li>
+    <li>cheat discord</li>
+    <li>cheat github</li>
+    <li>cheat creds</li>
+    <li>cheat enable zone management</li>
+    <li>cheat disable zone management</li>
+    <li>cheat pause zone</li>
+    <li>cheat resume zone</li>
+    <li>cheat pause bot spawn</li>
+    <li>cheat resume bot spawn</li>
   </ul>
 </details>
 

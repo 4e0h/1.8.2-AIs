@@ -2036,24 +2036,9 @@ void AFortPlayerControllerAthena::ServerCheat(UObject* Context, FFrame& Stack)
   Quick commands:
     cheat ar leg
     cheat ar epic
-    cheat pump leg
-    cheat pump epic
-    cheat stark leg
-    cheat stark epic
-    cheat burst leg
-    cheat burst epic
-    cheat mid drum
-    cheat grap
-    cheat skye grap
-    cheat monkey
-    cheat drift
-    cheat slurp fish <Count>
-    cheat shock <Count>
-    cheat chug spl <Count>
     cheat discord
     cheat github
     cheat creds
-    cheat 4e0h
 
   Owner only:
     cheat enable zone management
@@ -2163,137 +2148,24 @@ void AFortPlayerControllerAthena::ServerCheat(UObject* Context, FFrame& Stack)
                 Grant("WID_Assault_AutoHigh_Athena_VR_Ore_T03", 1);
                 return;
             }
-            if (Phrase == "pump leg")
-            {
-                Grant("WID_Shotgun_Standard_Athena_SR_Ore_T03", 1);
-                return;
-            }
-            if (Phrase == "pump epic")
-            {
-                Grant("WID_Shotgun_Standard_Athena_VR_Ore_T03", 1);
-                return;
-            }
-            if (Phrase == "stark leg")
-            {
-                Grant("WID_Assault_Stark_Athena_SR_Ore_T03", 1);
-                return;
-            }
-            if (Phrase == "stark epic")
-            {
-                Grant("WID_Assault_Stark_Athena_VR_Ore_T03", 1);
-                return;
-            }
-            if (Phrase == "burst leg")
-            {
-                Grant("WID_Assault_SemiAuto_Athena_SR_Ore_T03", 1);
-                return;
-            }
-            if (Phrase == "burst epic")
-            {
-                Grant("WID_Assault_SemiAuto_Athena_VR_Ore_T03", 1);
-                return;
-            }
-            if (Phrase == "mid drum")
-            {
-                Grant("WID_Boss_MidasDrumGun", 1);
-                return;
-            }
-            if (Phrase == "grap")
-            {
-                Grant("WID_Boss_Adventure_GH", 1);
-                return;
-            }
-            if (Phrase == "skye grap")
-            {
-                Grant("WID_Boss_Adventure_GH", 1);
-                return;
-            }
-            if (Phrase == "monkey")
-            {
-                Grant("WID_Athena_Banana", 1);
-                return;
-            }
-
-            if (Phrase == "drift")
-            {
-                if (!PlayerController->Pawn)
-                {
-                    Say(L"You need to be in the match to spawn a vehicle.");
-                    return;
-                }
-
-                auto Loc = PlayerController->Pawn->K2_GetActorLocation();
-                Loc.Z += 200.f;
-
-                UEAllocatedString PathNarrow = "/Game/Athena/DrivableVehicles/JackalVehicle_Athena.JackalVehicle_Athena_C";
-                UEAllocatedWString PathWide(PathNarrow.begin(), PathNarrow.end());
-
-                auto Class = FindObject<UClass>(PathWide.c_str());
-                if (!Class)
-                    Class = FindClass("JackalVehicle_Athena_C");
-
-                if (!Class)
-                {
-                    Say(L"Failed to find the driftboard class.");
-                    return;
-                }
-
-                auto Vehicle = UWorld::SpawnActor<AActor>(Class, Loc);
-
-                if (Vehicle)
-                    Say(L"Spawned driftboard");
-                else
-                    Say(L"Failed to spawn the driftboard.");
-
-                return;
-            }
-
-            if (args.size() >= 2 && Phrase.rfind("slurp fish", 0) == 0)
-            {
-                Grant("WID_Athena_Flopper_Effective", CountFrom(2));
-                return;
-            }
-
-            if (args.size() >= 1 && Phrase.rfind("shock", 0) == 0)
-            {
-                Grant("WID_Boss_Adventure_GH", CountFrom(1));
-                return;
-            }
-
-            if (args.size() >= 2 && Phrase.rfind("chug spl", 0) == 0)
-            {
-                Grant("Athena_ChillBronco", CountFrom(2));
-                return;
-            }
-
-            if (Phrase == "4e0h is a cheater")
-            {
-                Say(L"No im not :(");
-                return;
-            }
-            if (Phrase == "4e0h hates ogfn")
-            {
-                Say(L"nah fr");
-                return;
-            }
-            if (Phrase == "4e0h")
-            {
-                Say(L"Hey <3");
-                return;
-            }
             if (Phrase == "discord")
             {
-                Say(L"discord.gg/ZVTBWDjvFv");
+                Say(L"discord.gg/4e0h");
                 return;
             }
             if (Phrase == "github")
             {
-                Say(L"github.com/4e0h/14.60-With-Player-AIs");
+                Say(L"https://github.com/4e0h/1.8.2-AIs");
                 return;
             }
             if (Phrase == "creds")
             {
-                Say(L"Credits to ploosh for erbium (the base) and credits to 4e0h for implementing player ais");
+                Say(L"4e0h (Did the prompting and testing ofc)");
+                Say(L"Pongo (claude needed an understanding for the ais)");
+                Say(L"Ploosh (Claude needed a base)");
+                Say(L"Ralzify (Claude needed an understanding for quick commands)");
+                Say(L"Ralzify again (Claude needed help with spawning ais without phoebe or smt like that)");
+                Say(L"Claude (Did 99.9% of the work)");
                 return;
             }
 

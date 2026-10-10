@@ -164,7 +164,7 @@ namespace SDK
         ParamPair(UEAllocatedString Name, ValueType Val)
         {
             ParamName = Name;
-            
+            // really scuffed way to make this work, just using & gives the same address for each param
             Value = FMemory::Malloc(sizeof(ValueType));
             memcpy(Value, &Val, sizeof(ValueType));
         }
@@ -423,7 +423,7 @@ namespace SDK
                     return (UFunction*)Prop;
 
         return nullptr;
-        
+        // return (UFunction*)GetProperty(Name, 0x80000);
     }
 
     __declspec(noinline) inline UFunction* UObject::GetFunction(FName Name) const
@@ -434,7 +434,7 @@ namespace SDK
                     return (UFunction*)Prop;
 
         return nullptr;
-        
+        // return (UFunction*)GetProperty(Name, 0x80000);
     }
 
     class UFunction : public UStruct
@@ -477,7 +477,8 @@ namespace SDK
 
         void Call(const UObject* obj, UEAllocatedVector<ParamPair> Params)
         {
-
+            // if (this)
+            // obj->ProcessEvent(this, CreateParams(Params));
         }
 
         void operator()(const UObject* obj, void* Params)
@@ -516,7 +517,7 @@ namespace SDK
 
         struct Param
         {
-            
+            // UEAllocatedString Name;
             uint32 Offset;
             uint64 PropertyFlags;
             uint32 ElementSize;
@@ -582,6 +583,7 @@ namespace SDK
         if (!Function)
             return Ret();
 
+        // fast paths
         if constexpr (sizeof...(args) == 0 && std::is_void_v<Ret>)
             return ProcessEvent(Function, nullptr);
 
@@ -646,7 +648,8 @@ namespace SDK
             }
             else if constexpr (std::is_reference_v<decltype(args)>)
             {
-
+                // if ((Param.PropertyFlags & 0x2) != 0)
+                //	memcpy((PBYTE)&Arg, (const PBYTE)(__int64(Mem) + Param.Offset), Param.ElementSize);
             }
             i++;
         }(), ...);
@@ -973,12 +976,12 @@ namespace SDK
         return _storage;
     }
 
-    inline int StartingSerial = 676767676; 
+    inline int StartingSerial = 676767676; // scuffed
     class FWeakObjectPtr
     {
     public:
-        int32 ObjectIndex;        
-        int32 ObjectSerialNumber; 
+        int32 ObjectIndex;        // 0x0000(0x0004)(NOT AUTO-GENERATED PROPERTY)
+        int32 ObjectSerialNumber; // 0x0004(0x0004)(NOT AUTO-GENERATED PROPERTY)
 
         FWeakObjectPtr(int32 Index = -1, int32 SerialNumber = 0)
             : ObjectIndex(Index)
@@ -1215,7 +1218,7 @@ namespace SDK
         const UEType* Get()
         {
             return (UEType*)InternalGet(UEType::StaticClass());
-            
+            // return static_cast<const UEType*>(TPersistentObjectPtr::Get());
         }
         const UEType* operator->()
         {
@@ -1243,7 +1246,7 @@ namespace SDK
         UClass* Get()
         {
             return (UEType*)InternalGet(UClass::StaticClass());
-            
+            // return static_cast<UClass*>(TPersistentObjectPtr::Get());
         }
         UClass* operator->()
         {
@@ -1296,4 +1299,4 @@ namespace SDK
                     break;
                 }
     }
-} 
+} // namespace SDK

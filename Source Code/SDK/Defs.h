@@ -240,8 +240,10 @@ std::vector<void (*)()> _Inits;
 #define DEFINE_FUNC(Name, ...)                                                                                                                                                                                        \
     static inline UFunction* Name##__Ptr = nullptr;                                                                                                                                                                   \
     static inline bool Name##__Initialized = false;                                                                                                                                                                   \
-
-                                                                                                                                                                                                                \
+    /*void Name##_PE(void *Params)                                                                                                                                                                                    \
+    {                                                                                                                                                                                                                 \
+        this->Call<#Name>(Params);                                                                                                                                                                                    \
+    }*/                                                                                                                                                                                                               \
                                                                                                                                                                                                                       \
     template <typename... Args>                                                                                                                                                                                       \
     __VA_ARGS__ Name(Args&&... Params) const                                                                                                                                                                          \
@@ -254,12 +256,18 @@ std::vector<void (*)()> _Inits;
         return this->Call<__VA_ARGS__>(Name##__Ptr, Params...);                                                                                                                                                       \
     }                                                                                                                                                                                                                 \
                                                                                                                                                                                                                       \
+    /*void Name##_LP(UEAllocatedVector<ParamPair> Params)                                                                                                                                                             \
+    {                                                                                                                                                                                                                 \
+        this->Call<#Name>(Params);                                                                                                                                                                                    \
+    }*/
 
 #define DEFINE_STATIC_FUNC(Name, ...)                                                                                                                                                                                 \
     static inline UFunction* Name##__Ptr = nullptr;                                                                                                                                                                   \
     static inline bool Name##__Initialized = false;                                                                                                                                                                   \
-
-                                                                                                                                                                                                                \
+    /*static void Name##_PE(void *Params)                                                                                                                                                                             \
+    {                                                                                                                                                                                                                 \
+        GetDefaultObj()->Call<#Name>(Params);                                                                                                                                                                         \
+    }*/                                                                                                                                                                                                               \
                                                                                                                                                                                                                       \
     template <typename... Args>                                                                                                                                                                                       \
     static __VA_ARGS__ Name(Args&&... Params)                                                                                                                                                                         \
@@ -273,4 +281,7 @@ std::vector<void (*)()> _Inits;
         return DefaultObj->Call<__VA_ARGS__>(Name##__Ptr, Params...);                                                                                                                                                 \
     }                                                                                                                                                                                                                 \
                                                                                                                                                                                                                       \
-
+    /*static void Name##_LP(UEAllocatedVector<SDK::ParamPair> Params)                                                                                                                                                 \
+    {                                                                                                                                                                                                                 \
+        GetDefaultObj()->Call<#Name>(Params);                                                                                                                                                                         \
+    }*/

@@ -46,7 +46,7 @@ namespace SDK
         inline uint32_t FFrame_PropertyChainForCompiledIn = 0;
         inline uint32_t FFrame_CurrentNativeFunction = 0;
         inline uint32_t FFrame_Next = 0;
-    } 
+    } // namespace Offsets
 
     extern void UpdateNumElemsPerChunk();
     extern void InitializeProcessEventVft(uintptr_t);
@@ -73,7 +73,7 @@ namespace SDK
             auto GetStorage = (void* (*)())GetEngineVersionMethod2.RelativeOffset(23).Get();
             auto GetEngineVersion2 = (void (*)(void*, FStringNoOps*, int))CopyOfMethod2.RelativeOffset(42).Get();
 
-            GetEngineVersion2(GetStorage(), &OutVar, 4); 
+            GetEngineVersion2(GetStorage(), &OutVar, 4); // no idea why 4 but sure
         }
 
         std::wstring BuildString = OutVar.Data;
@@ -89,7 +89,7 @@ namespace SDK
         auto FortniteCLNum = std::stoull(FortniteCL);
 
         VersionInfo.EngineVersion = std::stod(EngineVersion);
-        
+        // these builds were just called "Cert"
         if (FortniteCLNum < 3901517)
         {
             switch (FortniteCLNum)
@@ -168,7 +168,7 @@ namespace SDK
             }
         }
 
-        if (!Offsets::AppendString || VersionInfo.EngineVersion > 5.3) 
+        if (!Offsets::AppendString || VersionInfo.EngineVersion > 5.3) // i dk what ver they inlined it on
         {
             Offsets::ToString = Memcury::Scanner::FindPattern("48 8B C4 48 89 58 ? 48 89 70 ? 48 89 78 ? 55 41 54 41 55 41 56 41 57 48 8D A8 ? ? ? ? 48 81 EC ? ? ? ? 48 8B 05 ? ? "
                                                               "? ? 48 33 C4 48 89 85 ? ? ? ? 45 33 ED 48 8B FA 4C 89 2A")
@@ -216,6 +216,7 @@ namespace SDK
             Offsets::GObjectsUnchunked = Addr.RelativeOffset(3).Get();
         }
 
+        // 1.8.2 Cert (CL 3741772) — Dumper-7 hard fallbacks if patterns miss
         if (VersionInfo.FortniteVersion == 1.82 || VersionInfo.FortniteVersion == 1.8)
         {
             const uintptr_t Base = (uintptr_t)GetModuleHandleW(nullptr);
@@ -223,7 +224,7 @@ namespace SDK
                 Offsets::AppendString = Base + 0x013480C0;
             if (!Offsets::GObjectsUnchunked && VersionInfo.EngineVersion < 4.21)
                 Offsets::GObjectsUnchunked = Base + 0x067AD690;
-            
+            // ProcessEvent @ Base+0x01438130, vtable index 62 (0x3E) — applied in InitializeProcessEventVft
         }
 
         Offsets::Step = Memcury::Scanner::FindPattern("48 8B 41 20 4C 8B D2 48 8B D1 44 0F B6 08 48 FF").Get();
@@ -485,4 +486,4 @@ namespace SDK
 
         InitializeProcessEventVft(addr);
     }
-} 
+} // namespace SDK

@@ -1,5 +1,7 @@
 #pragma once
 
+// Container implementations with iterators. See https://github.com/Fischsalat/UnrealContainers
+
 #include <map>
 #include <ostream>
 #include <set>
@@ -115,7 +117,10 @@ public:
 public:
     inline ArrayElementType& Add(const ArrayElementType& Element)
     {
+        /*if (NumElements + 1 > MaxElements) Data = (ArrayElementType*)realloc(Data, (MaxElements = NumElements + 1) * sizeof(ArrayElementType));
 
+        Data[NumElements++] = Element;
+        return Data[NumElements];*/
         _TStdArrayAdd((void*&)Data, NumElements, MaxElements, sizeof(ArrayElementType), &Element);
         return Data[NumElements];
     }
@@ -194,7 +199,7 @@ namespace UC
 
         template <typename KeyElementType, typename ValueElementType>
         using TMapIterator = TContainerIterator<TMap<KeyElementType, ValueElementType>>;
-    } 
+    } // namespace Iterators
 
     namespace ContainerImpl
     {
@@ -237,7 +242,7 @@ namespace UC
 
                 return 31 - FloorLog2(Value);
             }
-        } 
+        } // namespace HelperFunctions
 
         template <int32 Size, uint32 Alignment>
         struct TAlignedBytes
@@ -409,7 +414,7 @@ namespace UC
             int32 HashNextId;
             int32 HashIndex;
         };
-    } 
+    } // namespace ContainerImpl
 
     template <typename KeyType, typename ValueType>
     class TPair
@@ -563,6 +568,8 @@ namespace UC
 
         TArray(TArray&&) = default;
 
+        //~TArray() { if (Data) FMemory::Free(Data); }
+
     public:
         TArray& operator=(TArray&&) = default;
         TArray& operator=(const TArray&) = default;
@@ -594,6 +601,7 @@ namespace UC
             return Data;
         }
 
+        /* Adds to the array if there is still space for one more element */
         inline ArrayElementType& Add(const ArrayElementType& Element, int32 Size = ElementSize)
         {
             Reserve(1, Size);
@@ -613,7 +621,7 @@ namespace UC
             }
             NumElements++;
             memcpy(PBYTE((uint8*)Data + Index * Size), (const PBYTE)&Element, Size);
-            
+            //*(ArrayElementType*)((uint8*)Data + Index * Size) = Element;
             return *(ArrayElementType*)((uint8*)Data + Index * Size);
         }
 
@@ -626,14 +634,15 @@ namespace UC
 
             for (int i = Index; i < NumElements; i++)
             {
-                 
+                /* NumElements was decremented, acessing i + 1 is safe */
                 memcpy(PBYTE((uint8*)Data + i * Size), (const PBYTE)((uint8*)Data + (i + 1) * Size), Size);
             }
 
             return true;
         }
 
-        bool Contains(  ArrayElementType Item, int32 Size = ElementSize) const
+        // template <typename ComparisonType>
+        bool Contains(/*ComparisonType*/ ArrayElementType Item, int32 Size = ElementSize) const
         {
             for (int Idx = 0; Idx < NumElements; Idx++)
             {
@@ -729,7 +738,8 @@ namespace UC
 
         ~TArray()
         {
-
+            // if (Data)
+            //	FMemory::FreeForType<ArrayElementType>(Data);
         }
 
     public:
@@ -805,6 +815,7 @@ namespace UC
         {
             const uint32 NullTerminatedLength = static_cast<uint32>(std::wstring_view(Str).size() + 0x1);
 
+            // Data = const_cast<wchar_t*>(Str);
             Data = FMemory::MallocForType<wchar_t>(NullTerminatedLength);
             memcpy(Data, Str, NullTerminatedLength * sizeof(wchar_t));
             NumElements = NullTerminatedLength;
@@ -829,7 +840,7 @@ namespace UC
             return "";
         }
 
-        inline UEAllocatedString ToStr() const  
+        inline UEAllocatedString ToStr() const /* hopefully this shit ffucking wokrsksrkrskrskrsksrk!! */
         {
             if (*this)
             {
@@ -868,11 +879,23 @@ namespace UC
         }
     };
 
+    /*
+     * Class to allow construction of a TArray, that uses c-style standard-library memory allocation.
+     *
+     * Useful for calling functions that expect a buffer of a certain size and do not reallocate that buffer.
+     * This avoids leaking memory, if the array would otherwise be allocated by the engine, and couldn't be freed without FMemory-functions.
+     */
     template <typename ArrayElementType>
     class TAllocatedArray : public TArray<ArrayElementType>
     {
     };
 
+    /*
+     * Class to allow construction of an FString, that uses c-style standard-library memory allocation.
+     *
+     * Useful for calling functions that expect a buffer of a certain size and do not reallocate that buffer.
+     * This avoids leaking memory, if the array would otherwise be allocated by the engine, and couldn't be freed without FMemory-functions.
+     */
     class FAllocatedString : public FString
     {
     };
@@ -949,9 +972,11 @@ namespace UC
             }
         }
 
+        /** Empties the array, but keep its allocated memory as slack. */
         void Reset()
         {
 
+            // Free the allocated elements.
             Data.ResetNum();
             FirstFreeIndex = -1;
             NumFreeIndices = 0;
@@ -1083,7 +1108,7 @@ namespace UC
             }
         }
 
-        template <typename _Tp> 
+        template <typename _Tp> // for operator==
         __forceinline bool Contains(const _Tp& Element)
         {
             for (auto& SetElement : *this)
@@ -1104,7 +1129,7 @@ namespace UC
         {
             if (ShouldClearByElements())
             {
-                
+                // Faster path: only reset hash buckets to FSetElementId for elements in the hash
                 for (const SetDataType& Element : Elements)
                 {
                     Hash.GetAllocation()[Element.HashIndex] = -1;
@@ -1518,7 +1543,7 @@ namespace UC
                 return &IteratedContainer != &Other.IteratedContainer || BitIterator != Other.BitIterator;
             }
         };
-    } 
+    } // namespace Iterators
 
     inline Iterators::FSetBitIterator ContainerImpl::FBitArray::begin()
     {
@@ -1532,4 +1557,4 @@ namespace UC
     static_assert(sizeof(TArray<int32>) == 0x10, "TArray has a wrong size!");
     static_assert(sizeof(TSet<int32>) == 0x50, "TSet has a wrong size!");
     static_assert(sizeof(TMap<int32, int32>) == 0x50, "TMap has a wrong size!");
-} 
+} // namespace UC

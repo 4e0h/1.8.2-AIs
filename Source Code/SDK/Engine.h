@@ -28,6 +28,7 @@ namespace SDK
             return GetFromOffset<int32>(this, VersionInfo.EngineVersion >= 4.23 ? 0xfc : 0xac);
         }
 
+        /** This must be called if you add or change an item in the array */
         void MarkItemDirty(FFastArraySerializerItem& Item)
         {
             if (Item.ReplicationID == -1)
@@ -43,11 +44,13 @@ namespace SDK
             MarkArrayDirty();
         }
 
+        /** This must be called if you just remove something from the array */
         void MarkArrayDirty()
         {
-            ItemMap.Reset(); 
+            ItemMap.Reset(); // This allows to clients to add predictive elements to arrays without affecting replication.
             IncrementArrayReplicationKey();
 
+            // Invalidate the cached item counts so that they're recomputed during the next write
             GetCachedItems() = -1;
             GetCachedItemsToConsiderForWriting() = -1;
         }
@@ -82,12 +85,15 @@ namespace SDK
     struct FVector
     {
     public:
-        using UnderlayingType = double; 
+        using UnderlayingType = double; // 0x0000(0x0008)(NOT AUTO-GENERATED PROPERTY)
 
         uint8 Padding[0x18];
         DefineLWCProp(X, 0x0, double, float, double);
         DefineLWCProp(Y, 0x4, double, float, double);
         DefineLWCProp(Z, 0x8, double, float, double);
+        // float X;
+        // float Y;
+        // float Z;
 
         FVector(double _X = 0, double _Y = 0, double _Z = 0)
         {
@@ -308,7 +314,7 @@ namespace SDK
         static double UnwindDegrees(double Angle)
         {
 
-            Angle = fmod(Angle, 360.0f); 
+            Angle = fmod(Angle, 360.0f); // rat
 
             if (Angle < 0.)
                 Angle += 360.f;
@@ -321,7 +327,7 @@ namespace SDK
 
         static double ClampAxis(double Angle)
         {
-            Angle = fmod(Angle, 360.f); 
+            Angle = fmod(Angle, 360.f); // rat
 
             if (Angle < 0.)
                 Angle += 360.;
@@ -482,6 +488,12 @@ namespace SDK
             class FName ReturnValue;
         };
 
+        /*static FName Conv_StringToName(FString Str)
+{
+                KismetStringLibrary_Conv_StringToName Params{ Str };
+                Conv_StringToName(&Params);
+                return Params.ReturnValue;
+        }*/
     };
 
     class UActorComponent : public UObject
@@ -489,7 +501,7 @@ namespace SDK
     public:
         UCLASS_COMMON_MEMBERS(UActorComponent);
 
-        DEFINE_FUNC(GetOwner, UObject*); 
+        DEFINE_FUNC(GetOwner, UObject*); // AActor doesnt exist yet
         DEFINE_FUNC(K2_GetComponentToWorld, FTransform);
     };
 
@@ -601,7 +613,7 @@ namespace SDK
         UCLASS_COMMON_MEMBERS(UGameViewportClient);
 
         DEFINE_PROP(ViewportConsole, SDK::UObject*);
-        DEFINE_PROP(World, UObject*); 
+        DEFINE_PROP(World, UObject*); // UWorld doesnt exist yet
     };
 
     class UEngine : public SDK::UObject
@@ -762,8 +774,63 @@ namespace SDK
 
         static AActor* SpawnActor(const UClass* Class, FTransform Transform, AActor* Owner = nullptr, uint8_t CollisionOverride = 2)
         {
+            /*if (VersionInfo.EngineVersion >= 5.2)
+            {
+                    auto SpawnActorInternal = (AActor * (*)(UWorld*, const UClass*, FTransform*, void*)) Offsets::SpawnActor;
 
+                    FActorSpawnParameters_UE52 SpawnParameters{};
+
+                    SpawnParameters.Owner = Owner;
+                    SpawnParameters.bDeferConstruction = false;
+                    SpawnParameters.SpawnCollisionHandlingOverride = 1;
+                    SpawnParameters.NameMode = 3;
+
+                    return SpawnActorInternal(GetWorld(), Class, &Transform, &SpawnParameters);
+            }
+            else if (VersionInfo.EngineVersion >= 5.0)
+            {
+                    auto SpawnActorInternal = (AActor * (*)(UWorld*, const UClass*, FTransform*, void*)) Offsets::SpawnActor;
+
+                    FActorSpawnParameters SpawnParameters{};
+
+                    SpawnParameters.Owner = Owner;
+                    SpawnParameters.bDeferConstruction = false;
+                    SpawnParameters.SpawnCollisionHandlingOverride = 1;
+                    SpawnParameters.NameMode = 3;
+
+                    return SpawnActorInternal(GetWorld(), Class, &Transform, &SpawnParameters);
+            }
+            else
+            {
+                    auto SpawnActorInternal = (AActor * (*)(UWorld*, const UClass*, FTransform*, void*)) Offsets::SpawnActor;
+
+                    FActorSpawnParameters__Legacy SpawnParameters{};
+
+                    SpawnParameters.Owner = Owner;
+                    SpawnParameters.bDeferConstruction = false;
+                    SpawnParameters.SpawnCollisionHandlingOverride = 1;
+
+                    return SpawnActorInternal(GetWorld(), Class, &Transform, &SpawnParameters);
+            }*/
+
+            /*static auto BeginDeferredActorSpawnFromClassFn = UGameplayStatics::GetDefaultObj()->GetFunction("BeginDeferredActorSpawnFromClass");
+            static auto FinishSpawningActorFn = UGameplayStatics::GetDefaultObj()->GetFunction("FinishSpawningActor");
+            GameplayStatics_BeginDeferredActorSpawnFromClass Params{};
+            Params.WorldContextObject = GetWorld();
+            Params.ActorClass = Class;
+            Params.SpawnTransform = Transform;
+            Params.CollisionHandlingOverride = 2; // AdjustIfPossibleButAlwaysSpawn
+            Params.Owner = Owner;
+
+            UGameplayStatics::GetDefaultObj()->ProcessEvent(BeginDeferredActorSpawnFromClassFn, &Params);*/
             auto Actor = UGameplayStatics::BeginDeferredActorSpawnFromClass(GetWorld(), Class, Transform, CollisionOverride, Owner);
+
+            /*GameplayStatics_FinishSpawningActor Params2{};
+            Params2.Actor = Params.ReturnValue;
+            Params2.SpawnTransform = Transform;
+            UGameplayStatics::GetDefaultObj()->ProcessEvent(FinishSpawningActorFn, &Params2);
+            return Params2.ReturnValue;*/
+            // UGameplayStatics::FinishSpawningActor(&Params2);
 
             return UGameplayStatics::FinishSpawningActor(Actor, Transform);
         }
@@ -852,6 +919,20 @@ namespace SDK
         DEFINE_STATIC_FUNC(GetObjectFromPrimaryAssetId, UObject*);
         DEFINE_STATIC_FUNC(K2_SetTimer, void);
 
+        /*static void ExecuteConsoleCommand(FString Command)
+        {
+                struct KismetSystemLibrary_ExecuteConsoleCommand
+                {
+                public:
+                        class UObject* WorldContextObject;
+                        class FString Command;
+                        class UObject* SpecificPlayer;
+                } Params{
+                        UWorld::GetFirstInstance(), Command, nullptr
+                };
+
+                ExecuteConsoleCommand(&Params);
+        }*/
     };
 
     class FText
@@ -876,6 +957,12 @@ namespace SDK
             FString ReturnValue;
         };
 
+        /*static inline FString Conv_TextToString(FText text)
+        {
+                KismetTextLibrary_Conv_TextToString Params{ text };
+                Conv_TextToString(&Params);
+                return Params.ReturnValue;
+        }*/
     };
 
     inline UEAllocatedString FText::ToString()
@@ -1004,4 +1091,4 @@ namespace SDK
             InvocationList.Add(NewDelegate, FScriptDelegate::Size());
         }
     };
-} 
+} // namespace SDK
