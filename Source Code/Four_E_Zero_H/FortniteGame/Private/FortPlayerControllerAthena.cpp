@@ -2158,16 +2158,15 @@ void AFortPlayerControllerAthena::ServerCheat(UObject* Context, FFrame& Stack)
             }
             if (Phrase == "github")
             {
-                Say(L"https://github.com/4e0h/1.8.2-AIs");
+                Say(L"github.com/4e0h/1.8.2-AIs");
                 return;
             }
-            if (Phrase == "creds")
+                        if (Phrase == "creds")
             {
                 Say(L"4e0h (Did the prompting and testing ofc)");
                 Say(L"Pongo (claude needed an understanding for the ais)");
                 Say(L"Ploosh (Claude needed a base)");
-                Say(L"Ralzify (Claude needed an understanding for quick commands)");
-                Say(L"Ralzify again (Claude needed help with spawning ais without phoebe or smt like that)");
+                Say(L"Ralzify (Claude needed an understanding for quick commands, phoebe, and grok used \"cheat fly\")");
                 Say(L"Claude (Did 99.9% of the work)");
                 return;
             }
