@@ -2019,6 +2019,8 @@ void AFortPlayerControllerAthena::ServerCheat(UObject* Context, FFrame& Stack)
     cheat spawnactor <class/path> - Spawns an actor near your location
     cheat sethealth <amount> - Sets your pawn's health (0-100)
     cheat setshield <amount> - Sets your pawn's shield (0-100)
+    cheat demospeed <Speed> - Sets the speed of the server
+    cheat speed <Speed> - Sets the player's movement speed
     cheat god - Toggles god mode
     cheat timeofday <Hour> - Sets the time of day (0-23)
     cheat pausetimeofday - Pauses/Unpauses the time of day
@@ -2028,6 +2030,7 @@ void AFortPlayerControllerAthena::ServerCheat(UObject* Context, FFrame& Stack)
     cheat savewaypoint - Saves your current location as a waypoint
     cheat waypoint <Name> - Loads a saved waypoint
     cheat skydive - Toggles skydiving
+    cheat fly <speed> - Toggles fly mode (with optional speed value)
     cheat giveitem <WID/path> <Count = 1> - Gives you an item
     cheat spawnpickup <WID/path> <Count = 1> - Spawns a pickup at your player's location
     cheat spawnactor <class/path> - Spawns an actor at your location + 5 meters
@@ -2259,6 +2262,22 @@ void AFortPlayerControllerAthena::ServerCheat(UObject* Context, FFrame& Stack)
                 PlayerController->ClientMessage(FString(L"Started the aircraft!"), FName(), 1.f);
             }
         }
+                else if (command == "pausesafezone")
+        {
+            UFortGameStateComponent_BattleRoyaleGamePhaseLogic::bPausedZone = true;
+            if (GameMode->HasbSafeZonePaused())
+                GameMode->bSafeZonePaused = true;
+            UKismetSystemLibrary::ExecuteConsoleCommand(UWorld::GetWorld(), FString(L"pausesafezone"), nullptr);
+            PlayerController->ClientMessage(FString(L"Paused the safe zone."), FName(), 1.f);
+        }
+        else if (command == "resumesafezone")
+        {
+            UFortGameStateComponent_BattleRoyaleGamePhaseLogic::bPausedZone = false;
+            if (GameMode->HasbSafeZonePaused())
+                GameMode->bSafeZonePaused = false;
+            UKismetSystemLibrary::ExecuteConsoleCommand(UWorld::GetWorld(), FString(L"startsafezone"), nullptr);
+            PlayerController->ClientMessage(FString(L"Resumed the safe zone."), FName(), 1.f);
+        }
         else if (command == "skipsafezone")
         {
             if (GameMode->HasSafeZoneIndicator())
@@ -2304,9 +2323,18 @@ void AFortPlayerControllerAthena::ServerCheat(UObject* Context, FFrame& Stack)
             FConfiguration::bInfiniteAmmo ^= 1;
         else if (command == "infinitemats")
             FConfiguration::bInfiniteMats ^= 1;
-        else if (command == "demospeed")
+                else if (command == "demospeed")
         {
-            PlayerController->ClientMessage(FString(L"This command is disabled."), FName(), 1.f);
+            if (args.size() != 2)
+            {
+                PlayerController->ClientMessage(FString(L"Wrong number of arguments!"), FName(), 1.f);
+                return;
+            }
+
+            auto ws = L"demospeed " + UEAllocatedWString(args[1].begin(), args[1].end());
+
+            UKismetSystemLibrary::ExecuteConsoleCommand(UWorld::GetWorld(), FString(ws.c_str()), nullptr);
+            PlayerController->ClientMessage(FString(L"Modified the server's demospeed!"), FName(), 1.f);
         }
         else if (command == "god")
         {
@@ -2351,9 +2379,41 @@ void AFortPlayerControllerAthena::ServerCheat(UObject* Context, FFrame& Stack)
                 PlayerController->ClientMessage(FString(L"God mode disabled!"), FName(), 1);
             }
         }
-        else if (command == "speed")
+                else if (command == "speed")
         {
-            PlayerController->ClientMessage(FString(L"This command is disabled."), FName(), 1.f);
+            float Speed = 1.0f;
+
+            if (args.size() > 1)
+            {
+                try
+                {
+                    Speed = std::stof(std::string(args[1]));
+                }
+                catch (...)
+                {
+                    PlayerController->ClientMessage(FString(L"Invalid speed value"), FName(), 1.f);
+                    return;
+                }
+            }
+
+            auto Pawn = PlayerController->Pawn;
+
+            if (!Pawn)
+            {
+                PlayerController->ClientMessage(FString(L"No pawn to set speed"), FName(), 1.f);
+                return;
+            }
+
+            static auto SetMovementSpeedFn = Pawn->GetFunction("SetMovementSpeed");
+
+            if (!SetMovementSpeedFn)
+                SetMovementSpeedFn = Pawn->GetFunction("SetMovementSpeedMultiplier");
+
+            if (!SetMovementSpeedFn)
+                return;
+
+            Pawn->ProcessEvent(SetMovementSpeedFn, &Speed);
+            PlayerController->ClientMessage(FString(L"Set player speed!"), FName(), 1.f);
         }
         else if (command == "gravity")
         {
@@ -2810,14 +2870,53 @@ void AFortPlayerControllerAthena::ServerCheat(UObject* Context, FFrame& Stack)
 
             Builds.Free();
         }
-        else if (command == "fly")
+                                else if (command == "fly")
         {
-            PlayerController->MyFortPawn->bActorEnableCollision = true;
-            auto MovementComp = PlayerController->MyFortPawn->CharacterMovement;
+            auto Pawn = PlayerController->MyFortPawn ? PlayerController->MyFortPawn : (AFortPlayerPawnAthena*)PlayerController->Pawn;
 
-            MovementComp->bCheatFlying ^= 1;
-            MovementComp->SetMovementMode(MovementComp->bCheatFlying ? 5 : 3, 67);
-            PlayerController->ClientMessage(MovementComp->bCheatFlying ? FString(L"Flying is now enabled!") : FString("Flying is now disabled!"), FName(), 1.f);
+            if (!Pawn)
+            {
+                PlayerController->ClientMessage(FString(L"No pawn found!"), FName(), 1.f);
+                return;
+            }
+
+            Pawn->bActorEnableCollision = true;
+
+            if (Pawn->CharacterMovement)
+            {
+                Pawn->CharacterMovement->bCheatFlying = !Pawn->CharacterMovement->bCheatFlying;
+
+                if (Pawn->CharacterMovement->bCheatFlying)
+                {
+                    Pawn->CharacterMovement->SetMovementMode(5, 0);
+                    PlayerController->ClientMessage(FString(L"Enabled flying!"), FName(), 1.f);
+
+                    if (args.size() == 2)
+                    {
+                        try {
+                            float Speed = std::stof(std::string(args[1]));
+                            static auto SetMovementSpeedFn = Pawn->GetFunction("SetMovementSpeed");
+                            if (!SetMovementSpeedFn)
+                                SetMovementSpeedFn = Pawn->GetFunction("SetMovementSpeedMultiplier");
+                            if (SetMovementSpeedFn)
+                                Pawn->ProcessEvent(SetMovementSpeedFn, &Speed);
+                        } catch (...) {}
+                    }
+                }
+                else
+                {
+                    Pawn->CharacterMovement->SetMovementMode(3, 0);
+
+                    float ResetSpeed = 1.0f;
+                    static auto SetMovementSpeedFn2 = Pawn->GetFunction("SetMovementSpeed");
+                    if (!SetMovementSpeedFn2)
+                        SetMovementSpeedFn2 = Pawn->GetFunction("SetMovementSpeedMultiplier");
+                    if (SetMovementSpeedFn2)
+                        Pawn->ProcessEvent(SetMovementSpeedFn2, &ResetSpeed);
+
+                    PlayerController->ClientMessage(FString(L"Disabled flying"), FName(), 1.f);
+                }
+            }
         }
         else if (command == "flyspeed")
         {
