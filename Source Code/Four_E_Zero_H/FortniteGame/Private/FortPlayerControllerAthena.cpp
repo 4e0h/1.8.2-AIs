@@ -2006,9 +2006,8 @@ void AFortPlayerControllerAthena::ServerCheat(UObject* Context, FFrame& Stack)
     cheat startaircraft - Starts the battle bus
     cheat skipsafezone - Skips to the next safe zone
     cheat startshrinksafezone - Starts shrinking the safe zone
-    cheat enable zone management - Unlocks pausing and resuming the zone
-    cheat pausesafezone - Holds the zone where it is (needs zone management)
-    cheat resumesafezone - Lets the zone move again (needs zone management)
+    cheat pausesafezone - Holds the zone where it is
+    cheat resumesafezone - Lets the zone move again
     cheat pause bot spawn - Stops bots joining so your friends can get in
     cheat resume bot spawn - Fills the lobby back up with bots
     cheat infiniteammo - Toggles infinite ammo
@@ -2044,8 +2043,6 @@ void AFortPlayerControllerAthena::ServerCheat(UObject* Context, FFrame& Stack)
     cheat creds
 
   Owner only:
-    cheat enable zone management
-    cheat disable zone management
     cheat pause zone
     cheat resume zone
     cheat pause bot spawn
@@ -2161,7 +2158,7 @@ void AFortPlayerControllerAthena::ServerCheat(UObject* Context, FFrame& Stack)
                 Say(L"github.com/4e0h/1.8.2-AIs");
                 return;
             }
-                        if (Phrase == "creds")
+                                    if (Phrase == "creds")
             {
                 Say(L"4e0h (Did the prompting and testing ofc)");
                 Say(L"Pongo (claude needed an understanding for the ais)");
@@ -2204,11 +2201,7 @@ void AFortPlayerControllerAthena::ServerCheat(UObject* Context, FFrame& Stack)
 
             if (Phrase == "pause zone" || Phrase == "pausezone" || Phrase == "pausesafezone")
             {
-                if (!UFortGameStateComponent_BattleRoyaleGamePhaseLogic::bZoneManagementUnlocked)
-                {
-                    Say(L"Type \"cheat enable zone management\" first.");
-                    return;
-                }
+                
 
                 UFortGameStateComponent_BattleRoyaleGamePhaseLogic::bPausedZone = true;
                 Say(L"Zone paused");
@@ -2217,11 +2210,7 @@ void AFortPlayerControllerAthena::ServerCheat(UObject* Context, FFrame& Stack)
 
             if (Phrase == "resume zone" || Phrase == "resumezone" || Phrase == "resumesafezone")
             {
-                if (!UFortGameStateComponent_BattleRoyaleGamePhaseLogic::bZoneManagementUnlocked)
-                {
-                    Say(L"Type \"cheat enable zone management\" first.");
-                    return;
-                }
+                
 
                 UFortGameStateComponent_BattleRoyaleGamePhaseLogic::bPausedZone = false;
                 Say(L"Zone resumed");
